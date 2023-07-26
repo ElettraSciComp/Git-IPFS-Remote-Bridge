@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+
+CONFIG_ROOT = '/home/twdragon/elettra/IPFS/git'
+CONFIG_FILE = 'git-ipfs-remote.conf'
+
+api_response = None
+response_content = None
+handler = None
+
+from pathlib import Path
+from urllib import parse as urlparser
+import configparser
+import sys
+
+if sys.platform == "win32":
+    import msvcrt
+
+
+def stdout_set_binary() -> None:
+    if sys.platform == "win32":
+        msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+
+
+import os
+import requests
+import json
+import enum
+
+
+class VerbosityType(enum.IntEnum):
+    ERROR = 0
+    INFO = 1
+    DEBUG = 2
+
+
+def cout(line: str) -> None:
+    sys.stdout.write(line)
+    sys.stdout.flush()
+
+
+def cerr(line: str) -> None:
+    sys.stderr.write(line)
+    sys.stderr.flush()
+
+
+def cin() -> str:
+    return sys.stdin.readline().strip()
+
+
+def writeln(msg: str = None) -> None:
+    if msg is None:
+        cout('\n')
+    else:
+        cout('{}\n'.format(msg))
+
+
+class GitRemoteIpfs:
+    def __init__(self, url: str) -> None:
+        self.url = url
+        self.verbosity = VerbosityType.DEBUG
+
+    def run(self) -> None:
+        while True:
+            cmd = cin()
+            if cmd == 'capabilities':
+                writeln('option')
+                writeln('list')
+                writeln('push')
+                writeln('fetch')
+                writeln()
+            elif cmd.startswith('option'):
+                self.option(cmd)
+            elif cmd.startswith('list'):
+                self.listing(cmd)
+            elif cmd == '':
+                break
+            else:
+                cerr('Unsupported operation: {}\n'.format(cmd))
+                sys.exit(1)
+
+    def option(self, opt: str) -> None:
+        if opt.startswith('option verbosity'):
+            self.verbosity = VerbosityType(int(opt[len("option verbosity "):]))
+            writeln('ok')
+        else:
+            writeln('unsupported')
+
+    def listing(self, opt: str) -> None:
+        hash, reference = self.git_references('for-push' in opt)
+
+    def git_references(self, prepare_push: bool) -> list[tuple[str, str]]:
+        
+
+
+stdout_set_binary()
+cerr('Git remote helper for IPFS\n')
+
+configuration = configparser.ConfigParser()
+configuration.read((Path(CONFIG_ROOT) / Path(CONFIG_FILE)).absolute())
+ipfs_config = configuration['IPFS']
+ipfs_api_base = ipfs_config.get('URL', 'http://127.0.0.1')
+ipfs_api_port = ipfs_config.getint('Port', 5001)
+ipfs_version_prefix = ipfs_config.get('VersionPrefix', 'api/v0')
+IPFS_API_URL = urlparser.urljoin(ipfs_api_base + ':' + str(ipfs_api_port), urlparser.quote(ipfs_version_prefix))
+
+
+def ipfs_command(command: str) -> str:
+    global IPFS_API_URL
+    return IPFS_API_URL + '/' + command
+
+
+api_response = requests.post(ipfs_command('version'))
+if api_response.status_code == 200:
+    response_content = api_response.json()
+    cerr('Found IPFS API node version {} at {}\n'.format(response_content['Version'] + '~' + response_content['Commit'],
+                                                         IPFS_API_URL))
+    handler = GitRemoteIpfs(IPFS_API_URL)
+    handler.run()
+else:
+    cerr('Cannot access IPFS API at {}: HTTP response {}, abort\n'.format(IPFS_API_URL, api_response.status_code))
+    sys.exit(1)
