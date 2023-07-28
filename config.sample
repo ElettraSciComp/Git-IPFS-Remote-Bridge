@@ -1,0 +1,8 @@
+[IPFS]
+URL = http://127.0.0.1
+Port = 5001
+VersionPrefix = api/v0
+Timeout = 5.0
+UnpinOld = True
+Republish = True
+IPNSTTLString = 24h

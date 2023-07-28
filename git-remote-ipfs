@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 
-CONFIG_ROOT = '/home/twdragon/elettra/IPFS/git'
-CONFIG_FILE = 'git-ipfs-remote.conf'
-
-api_response = None
-response_content = None
-handler = None
-
+import os
+import requests
+import enum
 from pathlib import Path
 from urllib import parse as urlparser
-import configparser
 import sys
+import subprocess
+import configparser
+import zlib
+import json
+
+# CONFIG_ROOT = '/home/twdragon/elettra/IPFS/git'
+# CONFIG_FILE = 'git-ipfs-remote.conf'
+
+handler = None
 
 if sys.platform == "win32":
     import msvcrt
@@ -19,12 +23,6 @@ if sys.platform == "win32":
 def stdout_set_binary() -> None:
     if sys.platform == "win32":
         msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-
-
-import os
-import requests
-import json
-import enum
 
 
 class VerbosityType(enum.IntEnum):
@@ -54,10 +52,111 @@ def writeln(msg: str = None) -> None:
         cout('{}\n'.format(msg))
 
 
+def writerr(msg: str = None) -> None:
+    if msg is None:
+        cerr('\n')
+    else:
+        cerr('{}\n'.format(msg))
+
+
 class GitRemoteIpfs:
-    def __init__(self, url: str) -> None:
-        self.url = url
+    def __init__(self, rname: str, rpath: str) -> None:
+        # DIRECTORIES
+        self.project_dir = Path(
+            subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).decode('utf-8').rstrip())
+        self.git_dir = Path(self.project_dir / Path('.git'))
+        Path(self.git_dir / Path('ipfs')).mkdir(parents=True, exist_ok=True)
+        # CONFIG
+        self.configuration = configparser.ConfigParser()
+        self.configuration_file = Path(self.git_dir / Path('ipfs') / Path('config')).absolute()
+        writerr(self.configuration_file)
+        if not self.configuration_file.is_file():
+            def_conf = '''[IPFS]
+URL = http://127.0.0.1
+Port = 5001
+VersionPrefix = api/v0
+Timeout = 5.0
+UnpinOld = True
+Republish = True
+IPNSTTLString = 24h'''
+            self.configuration_file.write_text(def_conf, encoding='utf-8')
+        self.configuration.read(self.configuration_file)
+        self.ipfs_config = self.configuration['IPFS']
+        self.ipfs_api_base = self.ipfs_config.get('URL', 'http://127.0.0.1')
+        self.ipfs_api_port = self.ipfs_config.getint('Port', 5001)
+        self.ipfs_version_prefix = self.ipfs_config.get('VersionPrefix', 'api/v0')
+        self.ipfs_api_url = urlparser.urljoin(self.ipfs_api_base + ':' + str(self.ipfs_api_port),
+                                              urlparser.quote(self.ipfs_version_prefix))
+        self.ipfs_request_timeout = self.ipfs_config.getfloat('Timeout', 30.0)
+        self.unpin_old = self.ipfs_config.getboolean('UnpinOld', False)
+        self.republish_ipns = self.ipfs_config.getboolean('Republish', False)
+        self.ipns_ttl = self.ipfs_config.get('IPNSTTLString', '2h')
+        # API ACCESS
+        try:
+            api_response = requests.post(self.ipfs_command('version'))
+        except requests.exceptions.ConnectionError:
+            writerr(
+                'Cannot access IPFS API at {}! Please check if you have a running node at the specified URL!'.format(
+                    self.ipfs_api_url))
+            sys.exit(1)
+        if api_response.status_code == 200:
+            response_content = api_response.json()
+            writerr('Found IPFS API node version {} at {}'.format(
+                response_content['Version'] + '~' + response_content['Commit'],
+                self.ipfs_api_url))
+        else:
+            writerr(
+                'Cannot access IPFS API at {}: HTTP response {}, abort'.format(self.ipfs_api_url,
+                                                                               api_response.status_code))
+            sys.exit(1)
+        # URIs
+        self.url = self.ipfs_api_url
+        self.remote_name = rname
+        self.remote_path = rpath
+        # IPFS REPOSITORY
+        self.ipfs_path = self.remote_path.split('://')
+        if len(self.ipfs_path) < 2:
+            writerr('Unable to parse remote URL for {}: {}'.format(self.remote_name, self.remote_path))
+            sys.exit(1)
+        self.timeout = self.ipfs_request_timeout
+        writerr('Checking remote URL {} for valid baremetal repository'.format(self.remote_path))
+        req_param = {
+            'arg': '/ipns/' + self.ipfs_path[1],
+            'headers': False,
+            'resolve-type': True,
+            'size': False,
+            'stream': False
+        }
+        self.accessible_repo = False
+        self.ipns_repo = False
+        self.empty_repo = False
+        # IPFS FILESYSTEM
+        try:
+            api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout)
+            if api_response.status_code == 200:
+                self.accessible_repo = True
+                writerr('Found valid IPNS entry')
+                self.ipns_repo = True
+        except requests.exceptions.ReadTimeout:
+            writerr('Valid IPNS repository not found at {}'.format(self.remote_path))
+            self.accessible_repo = False
+        if not self.ipns_repo:
+            req_param['arg'] = self.ipfs_path[1]
+            try:
+                api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout)
+                if api_response.status_code == 200:
+                    writerr('Found valid immutable IPFS entry')
+            except requests.exceptions.ReadTimeout:
+                writerr('Valid immutable IPFS entry not found at {}'.format(self.remote_path))
+                self.accessible_repo = False
+        self.ipfs_path = req_param['arg']
+        # GIT
+        self.references = {}
+        # MISC
         self.verbosity = VerbosityType.DEBUG
+
+    def ipfs_command(self, command: str) -> str:
+        return self.ipfs_api_url + '/' + command
 
     def run(self) -> None:
         while True:
@@ -72,6 +171,8 @@ class GitRemoteIpfs:
                 self.option(cmd)
             elif cmd.startswith('list'):
                 self.listing(cmd)
+            elif cmd.startswith('push'):
+                self.push(cmd)
             elif cmd == '':
                 break
             else:
@@ -86,36 +187,310 @@ class GitRemoteIpfs:
             writeln('unsupported')
 
     def listing(self, opt: str) -> None:
-        hash, reference = self.git_references('for-push' in opt)
+        prepare_push = 'for-push' in opt
+        references = self.git_references(prepare_push)
+        for hash, refname in references:
+            writeln('{} {}'.format(hash, refname))
+        if not prepare_push:
+            head = self.read_symbolic_reference('HEAD')
+            if head is not None:
+                writeln('@{} HEAD'.format(head))
+            else:
+                if self.verbosity >= VerbosityType.INFO:
+                    writerr('No default branch on remote {}'.format(self.remote_name))
+        writeln()
+
+    def push(self, opt: str) -> None:
+        remote_head = None
+        marked_deletion = []
+        push_objects = {}
+        push_references = {}
+        push_size = 0
+        forced = False
+        while True:
+            source_ref, destination_ref = opt.split(" ")[1].split(":")
+            if len(source_ref) == 0:
+                if self.verbosity == VerbosityType.DEBUG:
+                    writerr('Marking {} for deletion'.format(destination_ref))
+                head = self.read_symbolic_reference('HEAD')
+                if head is not None and head == destination_ref:
+                    writerr('Reference {} refused to delete current branch {}'.format(destination_ref, head))
+                else:
+                    marked_deletion.append(destination_ref)
+                    writeln('ok {}'.format(destination_ref))
+            else:
+                if self.verbosity == VerbosityType.DEBUG:
+                    writerr('Reference to push: {}:{}'.format(source_ref, destination_ref))
+                if source_ref.startswith('+'):
+                    forced = True
+                    source_ref = source_ref[1:]
+                referenced_objects = [i.split()[0] for i in
+                                      subprocess.check_output(['git', 'rev-list', '--objects', source_ref]).decode(
+                                          'utf-8').strip().split('\n')]
+                writerr('Compressing objects...')
+                # Writing objects
+                for obj in referenced_objects:
+                    obj_typestring = subprocess.check_output(['git', 'cat-file', '-t', obj]).decode('utf-8').strip()
+                    obj_size = subprocess.check_output(['git', 'cat-file', '-s', obj]).decode('utf-8').strip()
+                    obj_data = obj_typestring.encode('utf-8') + b' ' + obj_size.encode('utf-8') + b'\0'
+                    if obj_typestring is not None:
+                        obj_data += subprocess.check_output(['git', 'cat-file', obj_typestring, obj],
+                                                            stderr=subprocess.DEVNULL)
+                    else:
+                        obj_data += subprocess.check_output(['git', 'cat-file', '-p', obj], stderr=subprocess.DEVNULL)
+                    obj_encoded = zlib.compress(obj_data)
+                    del obj_data
+                    obj_path = obj[:2]
+                    obj_name = obj[2:]
+                    obj_posixpath = Path.as_posix(Path('objects') / Path(obj_path) / Path(obj_name))
+                    if self.verbosity == VerbosityType.DEBUG:
+                        writerr('[{:^10}] {}: compressed to {:.2%} ({} vs {} bytes)'.format(obj_typestring, obj, float(
+                            len(obj_encoded)) / float(obj_size), obj_size, len(obj_encoded)))
+                    push_objects[obj_posixpath] = obj_encoded
+                    push_size += len(obj_encoded)
+                if self.verbosity == VerbosityType.DEBUG:
+                    writerr('Referencing {}'.format(source_ref))
+                ref_hash = subprocess.check_output(['git', 'rev-parse', source_ref]).decode('utf-8').strip()
+                if not forced:
+                    found_hash = None
+                    for entry in self.references:
+                        if entry[1] == destination_ref:
+                            found_hash = entry[0]
+                            break
+                    if found_hash is not None:
+                        if subprocess.call(['git', 'cat-file', '-e', found_hash], stdout=subprocess.DEVNULL,
+                                           stderr=subprocess.DEVNULL) != 0:
+                            writeln('error {} fetch first'.format(destination_ref))
+                        else:
+                            if subprocess.call(['git', 'merge-base', '--is-ancestor', found_hash, ref_hash],
+                                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0:
+                                writeln('error {} non-fast forward'.format(destination_ref))
+                    else:
+                        push_references[destination_ref] = ref_hash
+                        writeln('ok {}'.format(destination_ref))
+                else:
+                    push_references[destination_ref] = ref_hash
+                    writeln('ok {}'.format(destination_ref))
+                if self.empty_repo:
+                    if remote_head is None or subprocess.check_output(['git', 'rev-parse', source_ref]).decode(
+                            'utf-8').strip() == subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode(
+                            'utf-8').strip():
+                        remote_head = subprocess.check_output(['git', 'rev-parse', destination_ref]).decode(
+                            'utf-8').strip()
+            opt = cin()
+            if len(opt) == 0:
+                if self.empty_repo:
+                    if self.verbosity == VerbosityType.DEBUG:
+                        writerr('Setting up default branch on the remote HEAD...')
+                    self.empty_repo = False
+                    if remote_head is not None:
+                        push_references['HEAD'] = remote_head
+                    else:
+                        writerr('Push to empty repository without specifying a default branch')
+                break
+        if self.verbosity == VerbosityType.DEBUG:
+            writerr('''\n{:*^30}
+
+Objects:
+=======
+{}
+=====
+Total: {}, {} bytes
+
+References:
+==========
+{}
+=====
+Total: {}
+
+Marked for deletion:
+===================
+{}
+=====
+Total: {}
+'''.format(' SUMMARY ',
+           '\n'.join('{}\t{}'.format(k, len(push_objects[k])) for k in push_objects.keys()),
+           len(push_objects),
+           push_size,
+           '\n'.join('{:<30} {:<50}'.format(k[:30], push_references[k]) for k in push_references.keys()),
+           len(push_references),
+           '\n'.join('{}. {}'.format(*k) for k in enumerate(marked_deletion)),
+           len(marked_deletion)))
+        writerr('Preparing IPFS data for upload')
+        req_param = {
+            'quiet': False,
+            'quieter': False,
+            'silent': False,
+            'progress': False,
+            'trickle': False,
+            'only-hash': False,
+            'wrap-with-directory': True,
+            'chunker': 'size-262144',
+            'raw-leaves': True,
+            'cid-version': '1',
+            'pin': True
+        }
+        files = {}
+        for o in push_objects.keys():
+            files[o] = push_objects[o]
+        for o in push_references.keys():
+            files[o] = push_references[o]
+        if subprocess.call(['git', 'update-server-info'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0:
+            writerr('Cannot update repository internal placement information. Abort')
+            sys.exit(1)
+        objects_location_info = (Path(self.git_dir) / Path('objects/info/packs')).open('rb').read()
+        references_location_info = (Path(self.git_dir) / Path('info/refs')).open('rb').read()
+        files['objects/info/packs'] = objects_location_info
+        files['info/refs'] = references_location_info
+        writerr('Uploading data...')
+        wrapper_dir_hash = None
+        try:
+            api_response = requests.post(self.ipfs_command('add'), params=req_param, files=files)
+            if api_response.status_code == 200:
+                wrapper_dir_hash = json.JSONDecoder().decode(api_response.content.decode('utf-8').rstrip().split('\n')[-1])['Hash']
+                writerr('\nNew immutable IPFS CID for repository (for dumb cloning etc.):\n\t{}'.format(wrapper_dir_hash))
+        except requests.exceptions.ReadTimeout:
+            writerr('Unable to upload data to IPFS node! Please check API accessibility!')
+            sys.exit(1)
+        if self.ipns_repo:
+            req_param = {
+                'arg': self.ipfs_path,
+                'recursive': True,
+                'nocache': False,
+                'dht-timeout': str(self.timeout) + 's',
+                'stream': False
+            }
+            api_response = requests.post(self.ipfs_command('name/resolve'), params=req_param)
+            old_cid = None
+            if api_response.status_code == 200:
+                old_cid = api_response.json()['Path'].split('/')[-1]
+                writerr('Old commit CID:\n\t{}\n'.format(old_cid))
+                if self.unpin_old:
+                    req_param = {
+                        'arg': self.ipfs_path,
+                        'recursive': True
+                    }
+                    api_response = requests.post(self.ipfs_command('pin/rm'), params=req_param, timeout=self.timeout)
+                    writerr('''{:*^30}
+{}
+'''.format(' UNPINNED ', '\n'.join('{}'.format(k) for k in api_response.json()['Pins'])))
+            if self.republish_ipns and wrapper_dir_hash is not None:
+                ipns_key = self.ipfs_path.split('/')[-1]
+                writerr('Attempting to republish IPNS name:\n\t{}'.format(ipns_key))
+                req_param = {
+                    'arg': wrapper_dir_hash,
+                    'resolve': True,
+                    'lifetime': self.ipns_ttl,
+                    'allow-offline': True,
+                    'key': ipns_key,
+                    'quieter': False,
+                    'ipns-base': 'base36'
+                }
+                api_response = requests.post(self.ipfs_command('name/publish'), params=req_param, timeout=300)
+                if api_response.status_code == 200:
+                    writerr('IPNS name republished, you may access the pushed commits via IPNS\nNo remote URL update required')
+                else:
+                    writerr('ATTENTION! Unable to update IPNS name!\n\tPlease use new CID listed above to access the pushed commits!')
+        else:
+            if wrapper_dir_hash is not None:
+                writerr('Updating remote URL to: {}'.format(wrapper_dir_hash))
+                if subprocess.call(['git', 'remote', 'set-url', self.remote_name, 'ipfs://' + wrapper_dir_hash]) != 0:
+                    writerr('Unable to set remote CID! Please check the repository!')
+                    sys.exit(1)
+        writeln()
+
+    def read_symbolic_reference(self, ipfs_prefix: str):
+        req_param = {
+            'arg': self.ipfs_path + '/' + ipfs_prefix,
+            'headers': False,
+            'resolve-type': True,
+            'size': True,
+            'stream': False
+        }
+        try:
+            api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout)
+            if api_response.status_code != 200:
+                if self.verbosity == VerbosityType.DEBUG:
+                    writerr('Cannot find symbolic reference /{} on the opened IPFS remote'.format(ipfs_prefix))
+                return None
+        except requests.exceptions.ReadTimeout:
+            if self.verbosity == VerbosityType.DEBUG:
+                writerr('Cannot retrieve symbolic reference /{} from the IPFS remote'.format(ipfs_prefix))
+            return None
+        if self.verbosity == VerbosityType.DEBUG:
+            writerr('Fetching symbolic reference /{}'.format(ipfs_prefix))
+        req_param = {
+            'arg': self.ipfs_path + '/' + ipfs_prefix,
+            'offset': 0,
+            'progress': False
+        }
+        api_response = requests.post(self.ipfs_command('cat'), params=req_param, timeout=self.timeout)
+        return api_response.content.decode('utf-8').split(': ')[1].rstrip()
+
+    def reference_names(self, ipfs_prefix) -> list[str]:
+        result = []
+        req_param = {
+            'arg': self.ipfs_path + '/' + ipfs_prefix,
+            'headers': False,
+            'resolve-type': True,
+            'size': True,
+            'stream': False
+        }
+        if self.verbosity == VerbosityType.DEBUG:
+            writerr('Exploring IPFS directory ipfs:/{}'.format(req_param['arg']))
+        api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout)
+        ipfs_list = None
+        if api_response.status_code == 200:
+            ipfs_list = api_response.json()
+        else:
+            return []
+        for entry in ipfs_list['Objects'][0]['Links']:
+            if entry['Type'] == 1 and entry['Size'] == 0:
+                result += self.reference_names(ipfs_prefix + '/' + entry['Name'])
+            elif entry['Type'] == 2:
+                result.append(ipfs_prefix + '/' + entry['Name'])
+            else:
+                if self.verbosity >= VerbosityType.INFO:
+                    writerr(
+                        'Possibly empty IPFS object {}:{} found on the repository'.format(entry['Name'], entry['Hash']))
+        return result
 
     def git_references(self, prepare_push: bool) -> list[tuple[str, str]]:
-        
+        writerr('Running stat on remote references')
+        result = []
+        if not self.accessible_repo and not prepare_push:
+            writerr('Error: cannot stat references from empty repo!')
+            return []
+        req_param = {
+            'arg': self.ipfs_path + '/refs',
+            'headers': False,
+            'resolve-type': True,
+            'size': True,
+            'stream': False
+        }
+        api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout)
+        entries = []
+        if api_response.status_code == 200:
+            entries = self.reference_names('refs')
+            for entry in entries:
+                req_param = {
+                    'arg': self.ipfs_path + '/' + entry,
+                    'offset': 0,
+                    'progress': False
+                }
+                api_response = requests.post(self.ipfs_command('cat'), params=req_param, timeout=self.timeout)
+                result.append((api_response.content.decode('utf-8').strip(), entry))
+        else:
+            writerr('It seems you have cloned an empty repository')
+            self.empty_repo = True
+            return []
+        for entry in result:
+            self.references[entry[1]] = entry[0]
+        return result
 
 
 stdout_set_binary()
-cerr('Git remote helper for IPFS\n')
+writerr('Git remote helper for IPFS')
 
-configuration = configparser.ConfigParser()
-configuration.read((Path(CONFIG_ROOT) / Path(CONFIG_FILE)).absolute())
-ipfs_config = configuration['IPFS']
-ipfs_api_base = ipfs_config.get('URL', 'http://127.0.0.1')
-ipfs_api_port = ipfs_config.getint('Port', 5001)
-ipfs_version_prefix = ipfs_config.get('VersionPrefix', 'api/v0')
-IPFS_API_URL = urlparser.urljoin(ipfs_api_base + ':' + str(ipfs_api_port), urlparser.quote(ipfs_version_prefix))
-
-
-def ipfs_command(command: str) -> str:
-    global IPFS_API_URL
-    return IPFS_API_URL + '/' + command
-
-
-api_response = requests.post(ipfs_command('version'))
-if api_response.status_code == 200:
-    response_content = api_response.json()
-    cerr('Found IPFS API node version {} at {}\n'.format(response_content['Version'] + '~' + response_content['Commit'],
-                                                         IPFS_API_URL))
-    handler = GitRemoteIpfs(IPFS_API_URL)
-    handler.run()
-else:
-    cerr('Cannot access IPFS API at {}: HTTP response {}, abort\n'.format(IPFS_API_URL, api_response.status_code))
-    sys.exit(1)
+handler = GitRemoteIpfs(sys.argv[1], sys.argv[2])
+handler.run()
