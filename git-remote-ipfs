@@ -11,9 +11,6 @@ import configparser
 import zlib
 import json
 
-# CONFIG_ROOT = '/home/twdragon/elettra/IPFS/git'
-# CONFIG_FILE = 'git-ipfs-remote.conf'
-
 handler = None
 
 if sys.platform == "win32":
@@ -69,7 +66,6 @@ class GitRemoteIpfs:
         # CONFIG
         self.configuration = configparser.ConfigParser()
         self.configuration_file = Path(self.git_dir / Path('ipfs') / Path('config')).absolute()
-        writerr(self.configuration_file)
         if not self.configuration_file.is_file():
             def_conf = '''[IPFS]
 URL = http://127.0.0.1
