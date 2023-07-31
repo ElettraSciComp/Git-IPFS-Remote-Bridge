@@ -286,8 +286,7 @@ IPNSTTLString = 24h'''
                     else:
                         writerr('Push to empty repository without specifying a default branch')
                 else:
-                    push_references['HEAD'] = subprocess.check_output(['git', 'rev-parse', destination_ref]).decode(
-                            'utf-8').strip()
+                    push_references['HEAD'] = destination_ref
                 break
         if self.verbosity == VerbosityType.DEBUG:
             writerr('''\n{:*^30}
