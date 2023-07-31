@@ -12,7 +12,6 @@ import zlib
 import json
 
 handler = None
-EMPTY_TREE_HASH: str = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
 if sys.platform == "win32":
     import msvcrt
@@ -59,6 +58,8 @@ def writerr(msg: str = None) -> None:
 
 class GitRemoteIpfs:
     def __init__(self, rname: str, rpath: str) -> None:
+        # CONSTANTS
+        self.EMPTY_TREE_HASH = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
         # DIRECTORIES
         self.project_dir = Path(
             subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).decode('utf-8').rstrip())
@@ -403,12 +404,28 @@ Total: {}
         writeln()
 
     def fetch(self, opt: str) -> None:
+        download_objects = set()
         while True:
             name, hash, val = opt.split(' ')
             if self.verbosity == VerbosityType.DEBUG:
                 writerr('Fetching object {}:{} [{}]'.format(name, val, hash))
+            if subprocess.call(['git', 'cat-file', '-e', hash]) == 0:
+                if hash == self.EMPTY_TREE_HASH:
+                    subprocess.Popen(['git', 'hash-object', '-w', '--stdin', '-t', 'tree'],  stdin=subprocess.PIPE,
+                                     stdout=subprocess.PIPE,
+                                     stderr=subprocess.DEVNULL).communicate(b'')
+                if subprocess.call(['git', 'rev-list', '--objects', hash]) != 0:
+                    writerr('Missing commit history for object {}'.format(hash))
+                    for o in self.dereference_object(hash):
+                        download_objects.add(o)
+                else:
+                    if self.verbosity == VerbosityType.DEBUG:
+                        writerr('Object {} already in the local repository'.format(hash))
+            else:
+                download_objects.add(hash)
             opt = cin()
             if len(opt) == 0:
+                # TODO: Implement the IPFS API downloader with ZLIB API dereferencer
                 break
         writeln()
 
@@ -439,6 +456,37 @@ Total: {}
         }
         api_response = requests.post(self.ipfs_command('cat'), params=req_param, timeout=self.timeout)
         return api_response.content.decode('utf-8').split(': ')[1].rstrip()
+
+    def dereference_object(self, obj: str) -> list[str]:
+        obj_typestring = subprocess.check_output(['git', 'cat-file', '-t', obj]).decode('utf-8').strip()
+        if obj_typestring == 'blob':
+            return []
+        obj_data = None
+        if obj_typestring is not None:
+            obj_data = subprocess.check_output(['git', 'cat-file', obj_typestring, obj], stderr=subprocess.DEVNULL).decode("utf-8").strip()
+        else:
+            obj_data = subprocess.check_output(['git', 'cat-file', '-p', obj], stderr=subprocess.DEVNULL).decode("utf-8").strip()
+        if obj_typestring == 'tag':
+            return [obj_data.split('\n', maxsplit=1)[0].split()[1]]
+        elif obj_typestring == 'commit':
+            lines = obj_data.split('\n')
+            tree = lines[0].split()[1]
+            objects = [tree]
+            for line in lines[1:]:
+                if line.startswith('parent '):
+                    objects.append(line.split()[1])
+                else:
+                    break
+            return objects
+        elif obj_typestring == 'tree':
+            if obj_data is None:
+                return []
+            lines = obj_data.split('\n')
+            # Filtering submodule hashes
+            return [line.split()[2] for line in lines if not line.startswith("160000 commit ")]
+        else:
+            writerr('Unexpected Git object type \'{}\' obtained for {}'.format(obj_typestring, obj))
+            sys.exit(1)
 
     def reference_names(self, ipfs_prefix) -> list[str]:
         result = []
