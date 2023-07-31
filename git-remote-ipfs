@@ -274,7 +274,7 @@ IPNSTTLString = 24h'''
                     if remote_head is None or subprocess.check_output(['git', 'rev-parse', source_ref]).decode(
                             'utf-8').strip() == subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode(
                             'utf-8').strip():
-                        remote_head = destination_ref
+                        remote_head = 'ref: ' + destination_ref
             opt = cin()
             if len(opt) == 0:
                 if self.empty_repo:
@@ -286,7 +286,7 @@ IPNSTTLString = 24h'''
                     else:
                         writerr('Push to empty repository without specifying a default branch')
                 else:
-                    push_references['HEAD'] = destination_ref
+                    push_references['HEAD'] = 'ref: ' + destination_ref
                 break
         if self.verbosity == VerbosityType.DEBUG:
             writerr('''\n{:*^30}
