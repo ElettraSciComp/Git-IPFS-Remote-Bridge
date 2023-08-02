@@ -274,7 +274,7 @@ IPNSTTLString = 24h'''
                 if self.empty_repo:
                     if remote_head is None or subprocess.check_output(['git', 'rev-parse', source_ref]).decode(
                             'utf-8').strip() == subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode(
-                            'utf-8').strip():
+                        'utf-8').strip():
                         remote_head = subprocess.check_output(['git', 'rev-parse', source_ref]).decode(
                             'utf-8').strip()
             opt = cin()
@@ -351,8 +351,10 @@ Total: {}
         try:
             api_response = requests.post(self.ipfs_command('add'), params=req_param, files=files)
             if api_response.status_code == 200:
-                wrapper_dir_hash = json.JSONDecoder().decode(api_response.content.decode('utf-8').rstrip().split('\n')[-1])['Hash']
-                writerr('\nNew immutable IPFS CID for repository (for dumb cloning etc.):\n\t{}'.format(wrapper_dir_hash))
+                wrapper_dir_hash = \
+                json.JSONDecoder().decode(api_response.content.decode('utf-8').rstrip().split('\n')[-1])['Hash']
+                writerr(
+                    '\nNew immutable IPFS CID for repository (for dumb cloning etc.):\n\t{}'.format(wrapper_dir_hash))
         except requests.exceptions.ReadTimeout:
             writerr('Unable to upload data to IPFS node! Please check API accessibility!')
             sys.exit(1)
@@ -392,9 +394,11 @@ Total: {}
                 }
                 api_response = requests.post(self.ipfs_command('name/publish'), params=req_param, timeout=300)
                 if api_response.status_code == 200:
-                    writerr('IPNS name republished, you may access the pushed commits via IPNS\nNo remote URL update required')
+                    writerr(
+                        'IPNS name republished, you may access the pushed commits via IPNS\nNo remote URL update required')
                 else:
-                    writerr('ATTENTION! Unable to update IPNS name!\n\tPlease use new CID listed above to access the pushed commits!')
+                    writerr(
+                        'ATTENTION! Unable to update IPNS name!\n\tPlease use new CID listed above to access the pushed commits!')
         else:
             if wrapper_dir_hash is not None:
                 writerr('Updating remote URL to: {}'.format(wrapper_dir_hash))
@@ -404,28 +408,87 @@ Total: {}
         writeln()
 
     def fetch(self, opt: str) -> None:
-        download_objects = set()
         while True:
-            name, hash, val = opt.split(' ')
+            name, obj_hash, val = opt.split(' ')
             if self.verbosity == VerbosityType.DEBUG:
-                writerr('Fetching object {}:{} [{}]'.format(name, val, hash))
-            if subprocess.call(['git', 'cat-file', '-e', hash]) == 0:
-                if hash == self.EMPTY_TREE_HASH:
-                    subprocess.Popen(['git', 'hash-object', '-w', '--stdin', '-t', 'tree'],  stdin=subprocess.PIPE,
-                                     stdout=subprocess.PIPE,
-                                     stderr=subprocess.DEVNULL).communicate(b'')
-                if subprocess.call(['git', 'rev-list', '--objects', hash]) != 0:
-                    writerr('Missing commit history for object {}'.format(hash))
-                    for o in self.dereference_object(hash):
-                        download_objects.add(o)
+                writerr('Fetching object {} [{}] recursively'.format(val, obj_hash))
+            download_queue = [obj_hash]
+            while len(download_queue) > 0:
+                # Examination of the download link
+                obj = download_queue.pop()
+                if subprocess.call(['git', 'cat-file', '-e', obj]) == 0:
+                    if obj == self.EMPTY_TREE_HASH:
+                        subprocess.Popen(['git', 'hash-object', '-w', '--stdin', '-t', 'tree'], stdin=subprocess.PIPE,
+                                         stdout=subprocess.PIPE,
+                                         stderr=subprocess.DEVNULL).communicate(b'')
                 else:
+                    obj_path = obj[:2]
+                    obj_name = obj[2:]
+                    obj_posixpath = Path.as_posix(Path('objects') / Path(obj_path) / Path(obj_name))
                     if self.verbosity == VerbosityType.DEBUG:
-                        writerr('Object {} already in the local repository'.format(hash))
-            else:
-                download_objects.add(hash)
+                        writerr('Downloading {}'.format(obj_posixpath))
+                    req_param = {
+                        'arg': self.ipfs_path + '/' + obj_posixpath,
+                        'offset': 0,
+                        'progress': False
+                    }
+                    obj_data = None
+                    api_response = requests.post(self.ipfs_command('cat'), params=req_param, timeout=self.timeout)
+                    if api_response.status_code == 200:
+                        obj_data = zlib.decompress(api_response.content)
+                    if obj_data is not None:
+                        obj_header, obj_content = obj_data.split(b'\0', 1)
+                        obj_typestring = obj_header.split()[0].decode('utf-8')
+                        downloaded_hash = \
+                        subprocess.Popen(['git', 'hash-object', '-w', '--stdin', '-t', obj_typestring],
+                                         stdin=subprocess.PIPE,
+                                         stdout=subprocess.PIPE,
+                                         stderr=subprocess.DEVNULL).communicate(obj_content)[0].decode(
+                            "utf-8").strip()
+                        if downloaded_hash != obj:
+                            writerr('Hash mismatch for object {}, downloaded data have hash {}'.format(obj,
+                                                                                                       downloaded_hash))
+                            sys.exit(1)
+                # Examination of the local object
+                obj_typestring = subprocess.check_output(['git', 'cat-file', '-t', obj]).decode('utf-8').strip()
+                if self.verbosity == VerbosityType.DEBUG:
+                    writerr('Object {} type: {}'.format(obj, obj_typestring))
+                if obj_typestring == 'blob':
+                    continue
+                obj_data = None
+                if obj_typestring is None or obj_typestring == 'tree':
+                    obj_data = subprocess.check_output(['git', 'cat-file', '-p', obj],
+                                                       stderr=subprocess.DEVNULL).decode('utf-8').strip()
+                else:
+                    obj_data = subprocess.check_output(['git', 'cat-file', obj_typestring, obj],
+                                                       stderr=subprocess.DEVNULL).decode('utf-8').strip()
+                if obj_typestring == 'tag':
+                    if self.verbosity == VerbosityType.DEBUG:
+                        writerr('Traversing tag {}'.format(obj))
+                    download_queue += [obj_data.split('\n', maxsplit=1)[0].split()[1]]
+                elif obj_typestring == 'commit':
+                    if self.verbosity == VerbosityType.DEBUG:
+                        writerr('Traversing commit {}'.format(obj))
+                    lines = obj_data.split('\n')
+                    tree = lines[0].split()[1]
+                    objects = [tree]
+                    for line in lines[1:]:
+                        if line.startswith('parent '):
+                            objects.append(line.split()[1])
+                        else:
+                            break
+                    download_queue += objects
+                elif obj_typestring == 'tree':
+                    if obj_data is None:
+                        continue
+                    lines = obj_data.split('\n')
+                    # Filtering submodule hashes
+                    download_queue += [line.split()[2] for line in lines if not line.startswith("160000 commit ")]
+                else:
+                    writerr('Unexpected Git object type \'{}\' obtained for {}'.format(obj_typestring, obj))
+                    sys.exit(1)
             opt = cin()
             if len(opt) == 0:
-                # TODO: Implement the IPFS API downloader with ZLIB API dereferencer
                 break
         writeln()
 
@@ -456,37 +519,6 @@ Total: {}
         }
         api_response = requests.post(self.ipfs_command('cat'), params=req_param, timeout=self.timeout)
         return api_response.content.decode('utf-8').split(': ')[1].rstrip()
-
-    def dereference_object(self, obj: str) -> list[str]:
-        obj_typestring = subprocess.check_output(['git', 'cat-file', '-t', obj]).decode('utf-8').strip()
-        if obj_typestring == 'blob':
-            return []
-        obj_data = None
-        if obj_typestring is not None:
-            obj_data = subprocess.check_output(['git', 'cat-file', obj_typestring, obj], stderr=subprocess.DEVNULL).decode("utf-8").strip()
-        else:
-            obj_data = subprocess.check_output(['git', 'cat-file', '-p', obj], stderr=subprocess.DEVNULL).decode("utf-8").strip()
-        if obj_typestring == 'tag':
-            return [obj_data.split('\n', maxsplit=1)[0].split()[1]]
-        elif obj_typestring == 'commit':
-            lines = obj_data.split('\n')
-            tree = lines[0].split()[1]
-            objects = [tree]
-            for line in lines[1:]:
-                if line.startswith('parent '):
-                    objects.append(line.split()[1])
-                else:
-                    break
-            return objects
-        elif obj_typestring == 'tree':
-            if obj_data is None:
-                return []
-            lines = obj_data.split('\n')
-            # Filtering submodule hashes
-            return [line.split()[2] for line in lines if not line.startswith("160000 commit ")]
-        else:
-            writerr('Unexpected Git object type \'{}\' obtained for {}'.format(obj_typestring, obj))
-            sys.exit(1)
 
     def reference_names(self, ipfs_prefix) -> list[str]:
         result = []
