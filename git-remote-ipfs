@@ -451,8 +451,6 @@ Total: {}
                             sys.exit(1)
                 # Examination of the local object
                 obj_typestring = subprocess.check_output(['git', 'cat-file', '-t', obj]).decode('utf-8').strip()
-                if self.verbosity == VerbosityType.DEBUG:
-                    writerr('Object {} type: {}'.format(obj, obj_typestring))
                 if obj_typestring == 'blob':
                     continue
                 obj_data = None
