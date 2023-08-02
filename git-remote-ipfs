@@ -69,15 +69,25 @@ class GitRemoteIpfs:
         self.configuration = configparser.ConfigParser()
         self.configuration_file = Path(self.git_dir / Path('ipfs') / Path('config')).absolute()
         if not self.configuration_file.is_file():
-            def_conf = '''[IPFS]
-URL = http://127.0.0.1
-Port = 5001
-VersionPrefix = api/v0
-Timeout = 5.0
-UnpinOld = True
-Republish = True
-IPNSTTLString = 24h'''
-            self.configuration_file.write_text(def_conf, encoding='utf-8')
+            writerr('''
+Initial configuration not found!
+
+    IPFS remote processor cannot find the configuration file.
+    It is usually placed under your repository's root directory
+    by path .git/ipfs/config
+    
+    Likely it happened because the IPFS remote repository was not
+    initialized properly. To initialize it, select the proper
+    IPFS ID (CID if you have cloned the repository from immutable
+    source on IPFS network or gateway, or IPNS name to turn on
+    data republishing under peer-signed unique link name), and
+    call 'git ipfs install' command:
+    
+        git ipfs install <IPFS ID>
+    
+    to initialize your repository for working with IPFS remote.  
+''')
+            sys.exit(1)
         self.configuration.read(self.configuration_file)
         self.ipfs_config = self.configuration['IPFS']
         self.ipfs_api_base = self.ipfs_config.get('URL', 'http://127.0.0.1')
@@ -89,9 +99,16 @@ IPNSTTLString = 24h'''
         self.unpin_old = self.ipfs_config.getboolean('UnpinOld', False)
         self.republish_ipns = self.ipfs_config.getboolean('Republish', False)
         self.ipns_ttl = self.ipfs_config.get('IPNSTTLString', '2h')
+        self.cid_version = self.ipfs_config.getint('CIDVersion', 0)
+        self.ipfs_chunker = self.ipfs_config.get('IPFSChunker', 'size-262144')
+        self.ipfs_api_username = self.ipfs_config.get('UserName', None)
+        self.ipfs_api_token = self.ipfs_config.get('UserPassword', None)
+        self.ipfs_api_auth = None
+        if self.ipfs_api_username is not None and self.ipfs_api_token is not None:
+            self.ipfs_api_auth = (self.ipfs_api_username, self.ipfs_api_token)
         # API ACCESS
         try:
-            api_response = requests.post(self.ipfs_command('version'))
+            api_response = requests.post(self.ipfs_command('version'), auth=self.ipfs_api_auth)
         except requests.exceptions.ConnectionError:
             writerr(
                 'Cannot access IPFS API at {}! Please check if you have a running node at the specified URL!'.format(
@@ -130,7 +147,7 @@ IPNSTTLString = 24h'''
         self.empty_repo = False
         # IPFS FILESYSTEM
         try:
-            api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout)
+            api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout, auth=self.ipfs_api_auth)
             if api_response.status_code == 200:
                 self.accessible_repo = True
                 writerr('Found valid IPNS entry')
@@ -141,7 +158,7 @@ IPNSTTLString = 24h'''
         if not self.ipns_repo:
             req_param['arg'] = self.ipfs_path[1]
             try:
-                api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout)
+                api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout, auth=self.ipfs_api_auth)
                 if api_response.status_code == 200:
                     writerr('Found valid immutable IPFS entry')
             except requests.exceptions.ReadTimeout:
@@ -329,9 +346,9 @@ Total: {}
             'trickle': False,
             'only-hash': False,
             'wrap-with-directory': True,
-            'chunker': 'size-262144',
+            'chunker': self.ipfs_chunker,
             'raw-leaves': True,
-            'cid-version': '1',
+            'cid-version': str(self.cid_version),
             'pin': True
         }
         files = {}
@@ -349,7 +366,7 @@ Total: {}
         writerr('Uploading data...')
         wrapper_dir_hash = None
         try:
-            api_response = requests.post(self.ipfs_command('add'), params=req_param, files=files)
+            api_response = requests.post(self.ipfs_command('add'), params=req_param, files=files, auth=self.ipfs_api_auth)
             if api_response.status_code == 200:
                 wrapper_dir_hash = \
                 json.JSONDecoder().decode(api_response.content.decode('utf-8').rstrip().split('\n')[-1])['Hash']
@@ -366,7 +383,7 @@ Total: {}
                 'dht-timeout': str(self.timeout) + 's',
                 'stream': False
             }
-            api_response = requests.post(self.ipfs_command('name/resolve'), params=req_param)
+            api_response = requests.post(self.ipfs_command('name/resolve'), params=req_param, auth=self.ipfs_api_auth)
             old_cid = None
             if api_response.status_code == 200:
                 old_cid = api_response.json()['Path'].split('/')[-1]
@@ -376,7 +393,7 @@ Total: {}
                         'arg': self.ipfs_path,
                         'recursive': True
                     }
-                    api_response = requests.post(self.ipfs_command('pin/rm'), params=req_param, timeout=self.timeout)
+                    api_response = requests.post(self.ipfs_command('pin/rm'), params=req_param, timeout=self.timeout, auth=self.ipfs_api_auth)
                     writerr('''{:*^30}
 {}
 '''.format(' UNPINNED ', '\n'.join('{}'.format(k) for k in api_response.json()['Pins'])))
@@ -392,7 +409,7 @@ Total: {}
                     'quieter': False,
                     'ipns-base': 'base36'
                 }
-                api_response = requests.post(self.ipfs_command('name/publish'), params=req_param, timeout=300)
+                api_response = requests.post(self.ipfs_command('name/publish'), params=req_param, timeout=300, auth=self.ipfs_api_auth)
                 if api_response.status_code == 200:
                     writerr(
                         'IPNS name republished, you may access the pushed commits via IPNS\nNo remote URL update required')
@@ -433,7 +450,7 @@ Total: {}
                         'progress': False
                     }
                     obj_data = None
-                    api_response = requests.post(self.ipfs_command('cat'), params=req_param, timeout=self.timeout)
+                    api_response = requests.post(self.ipfs_command('cat'), params=req_param, timeout=self.timeout, auth=self.ipfs_api_auth)
                     if api_response.status_code == 200:
                         obj_data = zlib.decompress(api_response.content)
                     if obj_data is not None:
@@ -499,7 +516,7 @@ Total: {}
             'stream': False
         }
         try:
-            api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout)
+            api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout, auth=self.ipfs_api_auth)
             if api_response.status_code != 200:
                 if self.verbosity == VerbosityType.DEBUG:
                     writerr('Cannot find symbolic reference /{} on the opened IPFS remote'.format(ipfs_prefix))
@@ -515,7 +532,7 @@ Total: {}
             'offset': 0,
             'progress': False
         }
-        api_response = requests.post(self.ipfs_command('cat'), params=req_param, timeout=self.timeout)
+        api_response = requests.post(self.ipfs_command('cat'), params=req_param, timeout=self.timeout, auth=self.ipfs_api_auth)
         return api_response.content.decode('utf-8').split(': ')[1].rstrip()
 
     def reference_names(self, ipfs_prefix) -> list[str]:
@@ -529,7 +546,7 @@ Total: {}
         }
         if self.verbosity == VerbosityType.DEBUG:
             writerr('Exploring IPFS directory ipfs:/{}'.format(req_param['arg']))
-        api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout)
+        api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout, auth=self.ipfs_api_auth)
         ipfs_list = None
         if api_response.status_code == 200:
             ipfs_list = api_response.json()
@@ -559,7 +576,7 @@ Total: {}
             'size': True,
             'stream': False
         }
-        api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout)
+        api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout, auth=self.ipfs_api_auth)
         entries = []
         if api_response.status_code == 200:
             entries = self.reference_names('refs')
@@ -569,7 +586,7 @@ Total: {}
                     'offset': 0,
                     'progress': False
                 }
-                api_response = requests.post(self.ipfs_command('cat'), params=req_param, timeout=self.timeout)
+                api_response = requests.post(self.ipfs_command('cat'), params=req_param, timeout=self.timeout, auth=self.ipfs_api_auth)
                 result.append((api_response.content.decode('utf-8').strip(), entry))
         else:
             writerr('It seems you have cloned an empty repository')
@@ -581,7 +598,7 @@ Total: {}
 
 
 stdout_set_binary()
-writerr('Git remote helper for IPFS')
+writerr('Git IPFS remote client')
 
 handler = GitRemoteIpfs(sys.argv[1], sys.argv[2])
 handler.run()
