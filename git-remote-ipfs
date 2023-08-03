@@ -67,6 +67,7 @@ class GitRemoteIpfs:
         Path(self.git_dir / Path('ipfs')).mkdir(parents=True, exist_ok=True)
         # CONFIG
         self.configuration = configparser.ConfigParser()
+        self.configuration.optionxform = str  # Workaround for case-sensitive use case
         self.configuration_file = Path(self.git_dir / Path('ipfs') / Path('config')).absolute()
         if not self.configuration_file.is_file():
             writerr('''
