@@ -106,10 +106,6 @@ clone_parser.add_argument('-p', '--password',
 # INSTALL
 install_parser = command_parsers.add_parser('install',
                                             help='Installs infrastructure scripts to enable IPFS directory as remote repository')
-install_parser.add_argument('ipfs_id',
-                            action='store',
-                            nargs=1,
-                            help='IPFS CID or IPNS peer name to use as remote ID')
 install_parser.add_argument('api_url',
                             action='store',
                             nargs=1,
@@ -120,6 +116,11 @@ install_parser.add_argument('api_port',
                             nargs='?',
                             help='IPFS node API port (will be attached to URL) [%(default)s]',
                             default='5001')
+install_parser.add_argument('ipfs_id',
+                            action='store',
+                            nargs='?',
+                            help='IPFS CID or IPNS peer name to use as remote ID',
+                            default=argparse.SUPPRESS)
 install_parser.add_argument('-t', '--timeout',
                             action='store',
                             required=False,
@@ -467,10 +468,62 @@ Please uninstall the previous configuration to repeat the installation''')
     cfw = git_ipfs_config_file.open('w', encoding='utf-8')
     default_configuration.write(cfw)
     cfw.close()
+    ipfs_id = None
+    if 'ipfs_id' not in arguments:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            data = {}
+            tmp_path = Path(tmp_dir)
+            if subprocess.call(['git', 'init', '--bare', tmp_path]) != 0:
+                print('Error creating nesting repository on IPFS side')
+                sys.exit(1)
+            for fobj in tmp_path.rglob('*'):
+                if Path(fobj).is_dir():
+                    pass
+                else:
+                    data[str(Path(fobj).relative_to(tmp_path))] = Path(fobj).open('rb').read()
+            req_param = {
+                'quiet': False,
+                'quieter': False,
+                'silent': False,
+                'progress': False,
+                'trickle': False,
+                'only-hash': False,
+                'wrap-with-directory': True,
+                'chunker': default_ipfs_configuration['IPFSChunker'],
+                'raw-leaves': True,
+                'cid-version': default_ipfs_configuration['CIDVersion'],
+                'pin': True
+            }
+            print(data)
+            api_auth = None
+            if 'UserName' in default_ipfs_configuration and 'UserPassword' in default_ipfs_configuration:
+                api_auth = (default_ipfs_configuration['UserName'], default_ipfs_configuration['UserPassword'])
+            ipfs_url = urlparser.urljoin(
+                default_ipfs_configuration['URL'] + ':' + str(default_ipfs_configuration['Port']),
+                urlparser.quote(default_ipfs_configuration['VersionPrefix']))
+            if ipfs_url == default_ipfs_configuration['VersionPrefix']:
+                print('Invalid IPFS API URL! Please check the input values')
+                sys.exit(1)
+            wrapper_dir_hash = None
+            try:
+                api_response = requests.post(ipfs_url + '/add', params=req_param, files=data, auth=api_auth,
+                                             timeout=300)
+                if api_response.status_code == 200:
+                    wrapper_dir_hash = \
+                        json.JSONDecoder().decode(api_response.content.decode('utf-8').rstrip().split('\n')[-1])['Hash']
+                    print(
+                        '\nNew immutable IPFS CID for release:\n\t{}'.format(wrapper_dir_hash))
+            except requests.exceptions.ReadTimeout:
+                print('Unable to upload data to IPFS node! Please check API accessibility!')
+                sys.exit(1)
+            if wrapper_dir_hash is not None:
+                ipfs_id = wrapper_dir_hash
+    else:
+        ipfs_id = arguments.ipfs_id
     git_remotes = subprocess.check_output(['git', 'remote']).decode('utf-8').strip().split('\n')
     if git_remotes is None or arguments.remote_name not in git_remotes:
         print('Installing remote {}'.format(arguments.remote_name))
-        if subprocess.call(['git', 'remote', 'add', arguments.remote_name, 'ipfs://' + arguments.ipfs_id[0]]) != 0:
+        if subprocess.call(['git', 'remote', 'add', arguments.remote_name, 'ipfs://' + ipfs_id]) != 0:
             print('Error assigning remote!')
             sys.exit(1)
     else:
@@ -479,7 +532,7 @@ Please uninstall the previous configuration to repeat the installation''')
         pfw = git_ipfs_old_url.open('w', encoding='utf-8')
         pfw.write(remote_url)
         pfw.close()
-        if subprocess.call(['git', 'remote', 'set-url', arguments.remote_name, 'ipfs://' + arguments.ipfs_id[0]]) != 0:
+        if subprocess.call(['git', 'remote', 'set-url', arguments.remote_name, 'ipfs://' + ipfs_id]) != 0:
             print('Error redirecting URL of {}! Please consider recloning the repository'.format(arguments.remote_name))
             sys.exit(1)
     if arguments.check_ipfs:

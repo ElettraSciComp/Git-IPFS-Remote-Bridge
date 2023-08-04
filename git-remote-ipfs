@@ -162,6 +162,7 @@ Initial configuration not found!
                 api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout, auth=self.ipfs_api_auth)
                 if api_response.status_code == 200:
                     writerr('Found valid immutable IPFS entry')
+                    self.accessible_repo = True
             except requests.exceptions.ReadTimeout:
                 writerr('Valid immutable IPFS entry not found at {}'.format(self.remote_path))
                 self.accessible_repo = False
