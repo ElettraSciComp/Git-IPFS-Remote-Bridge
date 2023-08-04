@@ -478,7 +478,7 @@ Please uninstall the previous configuration to repeat the installation''')
                 sys.exit(1)
             for fobj in tmp_path.rglob('*'):
                 if Path(fobj).is_dir():
-                    pass
+                    data[str(Path(fobj).relative_to(tmp_path))] = None
                 else:
                     data[str(Path(fobj).relative_to(tmp_path))] = Path(fobj).open('rb').read()
             req_param = {
@@ -494,7 +494,6 @@ Please uninstall the previous configuration to repeat the installation''')
                 'cid-version': default_ipfs_configuration['CIDVersion'],
                 'pin': True
             }
-            print(data)
             api_auth = None
             if 'UserName' in default_ipfs_configuration and 'UserPassword' in default_ipfs_configuration:
                 api_auth = (default_ipfs_configuration['UserName'], default_ipfs_configuration['UserPassword'])
