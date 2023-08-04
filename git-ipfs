@@ -9,9 +9,12 @@ import requests
 import argparse
 import configparser
 import subprocess
+import tempfile
+import json
 
-
+# CONSTANTS
 LOGICAL_TRUE = ('true', '1', 't', '+')
+
 
 def recursive_remove(directory: Path) -> None:
     for fobj in directory.iterdir():
@@ -26,8 +29,30 @@ parser = argparse.ArgumentParser()
 command_parsers = parser.add_subparsers(title='Commands',
                                         description='Repository configuration commands for IPFS remote target',
                                         dest='commands')
-# TODO: BUNDLE/RELEASE
-
+# RELEASE
+bundle_parser = command_parsers.add_parser('release',
+                                           help='Creates and uploads to IPFS the bundle (release) of repository files addressed by the given commit ID or tag')
+bundle_parser.add_argument('tag',
+                           action='store',
+                           nargs=1,
+                           help='Tag or commit ID to release from',
+                           default=None)
+bundle_parser.add_argument('ipns_key',
+                           action='store',
+                           nargs='?',
+                           help='IPNS peer name to publish the release',
+                           default=argparse.SUPPRESS)
+bundle_parser.add_argument('--prefix',
+                           action='store',
+                           nargs='?',
+                           help='Version prefix for being used as a name for the archive',
+                           default='release')
+bundle_parser.add_argument('-p', '--publish',
+                           action='store_true',
+                           help='Publish the release over IPNS after uploading')
+bundle_parser.add_argument('-z', '--zip',
+                           action='store_true',
+                           help='Use ZIP archive format instead of .tar.gz')
 # CLONE
 clone_parser = command_parsers.add_parser('clone',
                                           help='Clones a repository from IPFS entry with all infrastructure scripts already installed')
@@ -221,7 +246,8 @@ generate_parser.add_argument('-p', '--password',
                              help='HTTP authentication password',
                              default=None)
 # Manage
-manage_parser = config_parsers.add_parser('manage', help='Adjusts existing IPFS remote config. NOTE: for most options leaving it without a value resets the corresponding parameter to default')
+manage_parser = config_parsers.add_parser('manage',
+                                          help='Adjusts existing IPFS remote config. NOTE: for most options leaving it without a value resets the corresponding parameter to default')
 manage_parser.add_argument('--dry-run',
                            action='store_true',
                            required=False,
@@ -348,6 +374,74 @@ default_ipfs_configuration = default_configuration['IPFS']
 
 print(arguments)
 
+if arguments.commands == 'release':
+    print('Releasing repository under the tag/commit {}'.format(arguments.tag))
+    default_configuration.read(git_ipfs_config_file)
+    default_ipfs_configuration = default_configuration['IPFS']
+    tag_name = arguments.tag[0]
+    file_name = arguments.prefix + '.tar.gz'
+    archive_format = 'tar.gz'
+    if arguments.zip:
+        file_name = arguments.prefix + '.zip'
+        archive_format = 'zip'
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(Path(tmp_dir) / Path(file_name))
+        print(tmp_path)
+        if subprocess.call(['git', 'archive', '-v', '--output', tmp_path, '--format', archive_format, tag_name]) != 0:
+            print('Error creating archive')
+            sys.exit(1)
+        print('Uploading...')
+        req_param = {
+            'quiet': False,
+            'quieter': False,
+            'silent': False,
+            'progress': False,
+            'trickle': False,
+            'only-hash': False,
+            'wrap-with-directory': True,
+            'chunker': default_ipfs_configuration['IPFSChunker'],
+            'raw-leaves': True,
+            'cid-version': default_ipfs_configuration['CIDVersion'],
+            'pin': True
+        }
+        data = {file_name: tmp_path.open('rb').read()}
+        api_auth = None
+        if 'UserName' in default_ipfs_configuration and 'UserPassword' in default_ipfs_configuration:
+            api_auth = (default_ipfs_configuration['UserName'], default_ipfs_configuration['UserPassword'])
+        ipfs_url = urlparser.urljoin(default_ipfs_configuration['URL'] + ':' + str(default_ipfs_configuration['Port']),
+                                     urlparser.quote(default_ipfs_configuration['VersionPrefix']))
+        if ipfs_url == default_ipfs_configuration['VersionPrefix']:
+            print('Invalid IPFS API URL! Please check the input values')
+            sys.exit(1)
+        wrapper_dir_hash = None
+        try:
+            api_response = requests.post(ipfs_url + '/add', params=req_param, files=data, auth=api_auth, timeout=300)
+            if api_response.status_code == 200:
+                wrapper_dir_hash = \
+                    json.JSONDecoder().decode(api_response.content.decode('utf-8').rstrip().split('\n')[-1])['Hash']
+                print(
+                    '\nNew immutable IPFS CID for release:\n\t{}'.format(wrapper_dir_hash))
+        except requests.exceptions.ReadTimeout:
+            print('Unable to upload data to IPFS node! Please check API accessibility!')
+            sys.exit(1)
+        if arguments.publish and 'ipns_key' in arguments and wrapper_dir_hash is not None:
+            print('Attempting to publish the data under IPNS name:\n\t{}'.format(arguments.ipns_key))
+            req_param = {
+                'arg': wrapper_dir_hash,
+                'resolve': True,
+                'lifetime': default_ipfs_configuration['IPNSTTLString'],
+                'allow-offline': True,
+                'key': arguments.ipns_key,
+                'quieter': False,
+                'ipns-base': 'base36'
+            }
+            api_response = requests.post(ipfs_url + '/name/publish', params=req_param,
+                                         timeout=float(default_ipfs_configuration['Timeout']), auth=api_auth)
+            if api_response.status_code == 200:
+                print('IPNS key updated. Please use it to share your release under name\n\t/ipns/{}\n'.format(arguments.ipns_key + '/' + file_name))
+            else:
+                print('ATTENTION! Unable to update IPNS key!\n\tPlease use new CID listed above to access the pushed release!')
+
 if arguments.commands == 'install':
     print('Installing IPFS infrastructure for repository {}'.format(project_dir))
     auth_token = None
@@ -380,7 +474,8 @@ Please uninstall the previous configuration to repeat the installation''')
             print('Error assigning remote!')
             sys.exit(1)
     else:
-        remote_url = arguments.remote_name + ' -- ' + subprocess.check_output(['git', 'remote', 'get-url', arguments.remote_name]).decode('utf-8').strip()
+        remote_url = arguments.remote_name + ' -- ' + subprocess.check_output(
+            ['git', 'remote', 'get-url', arguments.remote_name]).decode('utf-8').strip()
         pfw = git_ipfs_old_url.open('w', encoding='utf-8')
         pfw.write(remote_url)
         pfw.close()
@@ -397,7 +492,8 @@ Please check if you have a running node at the specified URL!'''.format(ipfs_url
             sys.exit(1)
         if api_response.status_code == 200:
             response_content = api_response.json()
-            print('Found IPFS API node version {} at {}'.format( response_content['Version'] + '~' + response_content['Commit'], ipfs_url))
+            print('Found IPFS API node version {} at {}'.format(
+                response_content['Version'] + '~' + response_content['Commit'], ipfs_url))
         else:
             print('''Cannot access IPFS API at {}: 
     HTTP response {}, abort'''.format(ipfs_url, api_response.status_code))
@@ -505,7 +601,8 @@ if arguments.commands == 'config':
         if not config_file.is_absolute():
             config_file = Path(project_dir / config_file).absolute()
         if config_file.is_file() and not arguments.overwrite and not arguments.stdout:
-            print('Permission denied to overwrite the existing configuration file!\nPlease set the \'-y\' flag to overwrite anyway')
+            print(
+                'Permission denied to overwrite the existing configuration file!\nPlease set the \'-y\' flag to overwrite anyway')
             sys.exit(1)
         if not arguments.default:
             default_ipfs_configuration['URL'] = arguments.url

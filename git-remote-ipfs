@@ -367,7 +367,7 @@ Total: {}
         writerr('Uploading data...')
         wrapper_dir_hash = None
         try:
-            api_response = requests.post(self.ipfs_command('add'), params=req_param, files=files, auth=self.ipfs_api_auth)
+            api_response = requests.post(self.ipfs_command('add'), params=req_param, files=files, auth=self.ipfs_api_auth, timeout=self.timeout)
             if api_response.status_code == 200:
                 wrapper_dir_hash = \
                 json.JSONDecoder().decode(api_response.content.decode('utf-8').rstrip().split('\n')[-1])['Hash']

@@ -1,1 +1,1 @@
-GIT IPFS
+Git IPFS Remote Bridge
