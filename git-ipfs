@@ -29,6 +29,9 @@ parser = argparse.ArgumentParser()
 command_parsers = parser.add_subparsers(title='Commands',
                                         description='Repository configuration commands for IPFS remote target',
                                         dest='commands')
+# CHECK
+check_parser = command_parsers.add_parser('check',
+                                          help='Checks the accessibility of IPFS API and validity of credentials')
 # RELEASE
 bundle_parser = command_parsers.add_parser('release',
                                            help='Creates and uploads to IPFS the bundle (release) of repository files addressed by the given commit ID or tag')
@@ -165,6 +168,8 @@ config_parser = command_parsers.add_parser('config',
 config_parsers = config_parser.add_subparsers(title='Configuration commands',
                                               description='Reconfiguration commands to maintain the repository with IPFS remote target installed',
                                               dest='commands_config')
+print_parser = config_parsers.add_parser('print',
+                                         help='Prints current configuration on the standard output')
 # Generate
 generate_parser = config_parsers.add_parser('generate',
                                             help='Generates/overwrites new IPFS remote config (use --stdout to print it back to the screen)')
@@ -339,7 +344,7 @@ if arguments.commands is None:
     sys.exit(0)
 # Clone / ready repo
 if not (arguments.commands == 'clone' or (arguments.commands == 'config' and arguments.commands_config == 'generate')):
-    print('CAUTION! IPFS management operation you selected requires git repository already initialized!')
+    # print('CAUTION! IPFS management operation you selected requires git repository already initialized!')
     project_dir = None
     try:
         project_dir = Path(
@@ -352,6 +357,15 @@ if not (arguments.commands == 'clone' or (arguments.commands == 'config' and arg
     git_ipfs_dir = Path(git_dir / Path('ipfs'))
     git_ipfs_config_file = Path(git_ipfs_dir / Path('config'))
     git_ipfs_old_url = Path(git_ipfs_dir / Path('old_url'))
+    if not git_ipfs_config_file.is_file() and not (arguments.commands == 'check' or arguments.commands_config == 'print'):
+        print('''Cannot find IPFS remote configuration file!
+Please run
+
+    git ipfs install
+
+to install the necessary scripts.
+NOTE: all configuration view/verification commands you use will use hardcoded default configuration''')
+        sys.exit(1)
 
 default_config = '''[IPFS]
 URL = http://127.0.0.1
@@ -373,7 +387,35 @@ default_configuration.optionxform = str
 default_configuration.read_string(default_config)
 default_ipfs_configuration = default_configuration['IPFS']
 
-print(arguments)
+# print(arguments)
+
+if arguments.commands == 'check':
+    default_configuration.read(git_ipfs_config_file)
+    default_ipfs_configuration = default_configuration['IPFS']
+    api_auth = None
+    if 'UserName' in default_ipfs_configuration and 'UserPassword' in default_ipfs_configuration:
+        api_auth = (default_ipfs_configuration['UserName'], default_ipfs_configuration['UserPassword'])
+    ipfs_url = urlparser.urljoin(default_ipfs_configuration['URL'] + ':' + str(default_ipfs_configuration['Port']),
+                                 urlparser.quote(default_ipfs_configuration['VersionPrefix']))
+    if ipfs_url == default_ipfs_configuration['VersionPrefix']:
+        print('Invalid IPFS API URL! Please check the values in the configuration')
+        sys.exit(1)
+    try:
+        api_response = requests.post(ipfs_url + '/version', auth=api_auth, timeout=float(default_ipfs_configuration['Timeout']))
+    except requests.exceptions.ConnectionError:
+        print(
+            'Cannot access IPFS API at {}!\nPlease check if you have a running node at the specified URL!'.format(
+                ipfs_url))
+        sys.exit(1)
+    if api_response.status_code == 200:
+        response_content = api_response.json()
+        print('Found IPFS API node version {} at {}'.format(
+            response_content['Version'] + '~' + response_content['Commit'],
+            ipfs_url))
+    else:
+        print('Cannot access IPFS API at {}: HTTP response {}, abort'.format(ipfs_url, api_response.status_code))
+        sys.exit(1)
+    print('IPFS API accessibility checked successfully')
 
 if arguments.commands == 'release':
     print('Releasing repository under the tag/commit {}'.format(arguments.tag))
@@ -633,6 +675,19 @@ if arguments.commands == 'clone':
     os.chdir(old_cwd)
 
 if arguments.commands == 'config':
+    if arguments.commands_config == 'print':
+        if not git_ipfs_config_file.is_file():
+            print('WARNING: IPFS remote is not initialized!\nThe default hard-coded configuration values will be printed out!')
+        else:
+            default_configuration.read(git_ipfs_config_file)
+            default_ipfs_configuration = default_configuration['IPFS']
+        print('')
+        strout = io.StringIO()
+        default_configuration.write(strout)
+        strout.seek(0)
+        print(strout.read())
+        strout.close()
+
     if arguments.commands_config == 'generate':
         config_file = None
         if arguments.filename is not None:
