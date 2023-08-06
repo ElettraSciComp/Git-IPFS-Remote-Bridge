@@ -97,13 +97,13 @@ clone_parser.add_argument('-b', '--branch',
 clone_parser.add_argument('-n', '--username',
                           action='store',
                           required=False,
-                          nargs=1,
+                          nargs='?',
                           help='HTTP authentication username',
                           default=None)
 clone_parser.add_argument('-p', '--password',
                           action='store',
                           required=False,
-                          nargs=1,
+                          nargs='?',
                           help='HTTP authentication password',
                           default=None)
 # INSTALL
@@ -132,19 +132,19 @@ install_parser.add_argument('-t', '--timeout',
 install_parser.add_argument('-r', '--remote-name',
                             action='store',
                             required=False,
-                            nargs=1,
+                            nargs='?',
                             help='Gives the remote name to make an IPFS remote, default is %(default)s',
                             default='origin')
 install_parser.add_argument('-n', '--username',
                             action='store',
                             required=False,
-                            nargs=1,
+                            nargs='?',
                             help='HTTP authentication username',
                             default=None)
 install_parser.add_argument('-p', '--password',
                             action='store',
                             required=False,
-                            nargs=1,
+                            nargs='?',
                             help='HTTP authentication password',
                             default=None)
 install_parser.add_argument('--check-ipfs',
@@ -159,7 +159,7 @@ uninstall_parser.add_argument('-p', '--purge',
 uninstall_parser.add_argument('-r', '--remote-name',
                               action='store',
                               required=False,
-                              nargs=1,
+                              nargs='?',
                               help='Gives the remote name to restore or remove',
                               default='origin')
 # CONFIG
@@ -195,25 +195,25 @@ generate_parser.add_argument('-y', '--overwrite',
 generate_parser.add_argument('--url',
                              action='store',
                              required=False,
-                             nargs=1,
+                             nargs='?',
                              default='http://127.0.0.1',
                              help='IPFS node API URL to locate (API must be active to view the remote Git database!), default is \'%(default)s\'')
 generate_parser.add_argument('--port',
                              action='store',
                              required=False,
-                             nargs=1,
+                             nargs='?',
                              default='5001',
                              help='IPFS node API TCP port (will be attached to URL), default is %(default)s')
 generate_parser.add_argument('--api-version-prefix',
                              action='store',
                              required=False,
-                             nargs=1,
+                             nargs='?',
                              default='api/v0',
                              help='IPFS node API version prefix (CAUTION! It is NOT RECOMMENDED to change the default value \'%(default)s\'!!!)')
 generate_parser.add_argument('-t', '--timeout',
                              action='store',
                              required=False,
-                             nargs=1,
+                             nargs='?',
                              help='Network timeout for API communications, sec (float), default is %(default)s',
                              default='30.0')
 generate_parser.add_argument('--unpin-old',
@@ -229,26 +229,26 @@ generate_parser.add_argument('-r', '--republish',
 generate_parser.add_argument('--ttl',
                              action='store',
                              required=False,
-                             nargs=1,
+                             nargs='?',
                              help='Period description string for IPNS republisher, default is \'%(default)s\'',
                              default='24h')
 generate_parser.add_argument('-v', '--cid-version',
                              action='store',
                              required=False,
-                             nargs=1,
+                             nargs='?',
                              choices=['0', '1'],
                              help='CID version used to create immutable entries, default is %(default)s',
                              default='1')
 generate_parser.add_argument('-n', '--username',
                              action='store',
                              required=False,
-                             nargs=1,
+                             nargs='?',
                              help='HTTP authentication username',
                              default=None)
 generate_parser.add_argument('-p', '--password',
                              action='store',
                              required=False,
-                             nargs=1,
+                             nargs='?',
                              help='HTTP authentication password',
                              default=None)
 # Manage
@@ -357,7 +357,7 @@ if not (arguments.commands == 'clone' or (arguments.commands == 'config' and arg
     git_ipfs_dir = Path(git_dir / Path('ipfs'))
     git_ipfs_config_file = Path(git_ipfs_dir / Path('config'))
     git_ipfs_old_url = Path(git_ipfs_dir / Path('old_url'))
-    if not git_ipfs_config_file.is_file() and not (arguments.commands == 'check' or arguments.commands_config == 'print'):
+    if not git_ipfs_config_file.is_file() and not (arguments.commands == 'install' or arguments.commands == 'uninstall' or (arguments.commands == 'config' and (arguments.commands_config == 'print' or arguments.commands_config == 'generate'))):
         print('''Cannot find IPFS remote configuration file!
 Please run
 
@@ -372,7 +372,7 @@ URL = http://127.0.0.1
 Port = 5001
 VersionPrefix = api/v0
 Timeout = 30.0
-UnpinOld = True
+UnpinOld = False
 Republish = True
 IPNSTTLString = 24h
 CIDVersion = 1
@@ -387,7 +387,7 @@ default_configuration.optionxform = str
 default_configuration.read_string(default_config)
 default_ipfs_configuration = default_configuration['IPFS']
 
-# print(arguments)
+#print(arguments)
 
 if arguments.commands == 'check':
     default_configuration.read(git_ipfs_config_file)
@@ -458,7 +458,7 @@ if arguments.commands == 'release':
             sys.exit(1)
         wrapper_dir_hash = None
         try:
-            api_response = requests.post(ipfs_url + '/add', params=req_param, files=data, auth=api_auth, timeout=300)
+            api_response = requests.post(ipfs_url + '/add', params=req_param, files=data, auth=api_auth, timeout=float(default_ipfs_configuration['Timeout']))
             if api_response.status_code == 200:
                 wrapper_dir_hash = \
                     json.JSONDecoder().decode(api_response.content.decode('utf-8').rstrip().split('\n')[-1])['Hash']
@@ -567,6 +567,10 @@ Please uninstall the previous configuration to repeat the installation''')
         if subprocess.call(['git', 'remote', 'add', arguments.remote_name, 'ipfs://' + ipfs_id]) != 0:
             print('Error assigning remote!')
             sys.exit(1)
+        remote_url = arguments.remote_name + ' -- NEW'
+        pfw = git_ipfs_old_url.open('w', encoding='utf-8')
+        pfw.write(remote_url)
+        pfw.close()
     else:
         remote_url = arguments.remote_name + ' -- ' + subprocess.check_output(
             ['git', 'remote', 'get-url', arguments.remote_name]).decode('utf-8').strip()
@@ -592,6 +596,7 @@ Please check if you have a running node at the specified URL!'''.format(ipfs_url
             print('''Cannot access IPFS API at {}: 
     HTTP response {}, abort'''.format(ipfs_url, api_response.status_code))
             sys.exit(1)
+    print('IPFS infrastructure successfully installed')
 
 if arguments.commands == 'uninstall':
     print('Ordering uninstallation of IPFS infrastructure')
@@ -602,11 +607,14 @@ if arguments.commands == 'uninstall':
         pfw = git_ipfs_old_url.open('r', encoding='utf-8')
         old_remote = pfw.read().strip().split(' -- ')
         pfw.close()
-        git_remotes = subprocess.check_output(['git', 'remote']).decode('utf-8').strip().split('\n')
-        if git_remotes is None or old_remote[0] not in git_remotes:
-            subprocess.call(['git', 'remote', 'add', old_remote[0], old_remote[1]])
+        if old_remote[1] == 'NEW':
+            subprocess.call(['git', 'remote', 'remove', old_remote[0]])
         else:
-            subprocess.call(['git', 'remote', 'set-url', old_remote[0], old_remote[1]])
+            git_remotes = subprocess.check_output(['git', 'remote']).decode('utf-8').strip().split('\n')
+            if git_remotes is None or old_remote[0] not in git_remotes:
+                subprocess.call(['git', 'remote', 'add', old_remote[0], old_remote[1]])
+            else:
+                subprocess.call(['git', 'remote', 'set-url', old_remote[0], old_remote[1]])
     else:
         git_remotes = subprocess.check_output(['git', 'remote']).decode('utf-8').strip().split('\n')
         if git_remotes is None or arguments.remote_name not in git_remotes:
@@ -675,6 +683,10 @@ if arguments.commands == 'clone':
     os.chdir(old_cwd)
 
 if arguments.commands == 'config':
+    if arguments.commands_config is None:
+        print('Please specify configuration mode!')
+        config_parser.print_help()
+        sys.exit(0)
     if arguments.commands_config == 'print':
         if not git_ipfs_config_file.is_file():
             print('WARNING: IPFS remote is not initialized!\nThe default hard-coded configuration values will be printed out!')
