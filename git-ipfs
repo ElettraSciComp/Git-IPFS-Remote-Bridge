@@ -363,7 +363,7 @@ Please run
 
     git ipfs install
 
-to install the necessary scripts.
+to install all the necessary scripts.
 NOTE: all configuration view/verification commands you use will use hardcoded default configuration''')
         sys.exit(1)
 
