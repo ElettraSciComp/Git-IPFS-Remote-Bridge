@@ -8,6 +8,14 @@ Git IPFS Remote Bridge is written in Python 3. It provides the following program
 
 Algorithms and logic here are partially inspired by [Dropbox Git helper](https://github.com/anishathalye/git-remote-dropbox) project.
 
+### Intended use cases
+- Sharing tagged version-controlled open source code in closed communities of volunteer programmers (like [TANGO](https://tango-controls.readthedocs.io/en/latest/))
+- Sharing version-controlled datasets with publisher signature required
+- Sharing mutable datasets with single publisher over untrusted download gateways
+- Self-signing of version-controlled datasets with automatic provenance using shared public key
+- [FAIR-compliant](https://www.go-fair.org/fair-principles/) data sharing via shared repositories compatible with Git
+- Publishing immutable release records for ordinary Git repositories not intended being accessible from public
+
 ## Features
 - **Git repository maintenance**. All the basic Git operations for repository maintenance and remote communication are supported.
 - **Self-hosted Git data.**. In case the  IPFS node on which the `push` operation is performed, is connected to the global IPFS network, the repository does not require anymore the server with installed Git for being accessible from anywhere. Moreover, the CID associated with the given state of the repository may be *pinned* being once known, to any IPFS node on the network improving the redundancy and reliability of the stored data.
@@ -60,6 +68,28 @@ where:
 - `<ID>` is IPFS CID or IPNS entry key to clone the repository from. It will be also used as the remote address.
 - `<directory>` is a relative path to the directory in which the downloaded repository data will be placed.
 - `<URL>` is an IPFS API URL as it was described above.
+
+### Configuration
+Configuration of the IPFS bridge is repository-specific. During the default installation process, the default configuration file is always installed. It complies with old INI key-value configuration format. The ordinary config file has the only section called `IPFS`. It is always named `config` being placed in `.git/ipfs` directory. This file contains both the regular setting intended to be adjusted by the `git ipfs` command, and advanced settings that should be adjusted manually.
+
+#### Regular Settings
+|Parameter|Default value|Description|
+|---------|-------------|-----------|
+| `URL` | `http://127.0.0.1` | Host URL of IPFS API endpoint |
+| `Port` | `5001` | API server's TCP port to connect |
+| `VersionPrefix` | `api/v0` | API URI prefix to stay compatible with future changes of the IPFS HTTP API |
+| `Timeout` | `30.0` | HTTP timeout for I/O operatons. Increase this parameter if the repository is big or you see the timeout messages during push operations |
+| `UnpinOld` | **false** | If this flag is set, the bridge will instruct the IPFS node to unpin the previous state of the repository from the IPFS network. Useful for large repositories shared over IPFS only using tags |
+| `Republish` | **true** | Attends to change the addressed immutable CID if an IPNS node is specified as the remote address in the Git repository |
+| `IPNSTTLString` | `24h` | String respresenting the duration of IPNS key ownership announcing after republishing |
+| `CIDVersion` | `1` | CID version used to generate for the obtained immutable entries. Due the CIDs of version 0 are case-sensitive and incompatible with URI specs, it is recommended to use `0` value only if IPNS node is used in the remote |
+| `UserName` | | Username to tell to HTTP API endpoint in case it is remote and _Basic_ or _Digest_ HTTP authentication is used. **This option is commented by default** |
+| `UserPassword` | | Username to tell to HTTP API endpoint in case it is remote and _Basic_ or _Digest_ HTTP authentication is used. **This option is commented by default** |
+
+#### Advanced Settings
+|Parameter|Default value|Description|
+|---------|-------------|-----------|
+| `IPFSChunker` | `size-65536` | Chunker routine name for being used to generate DHT data blocks for IPFS. Default is a linear chunker routine with 64KB block size |
 
 ### Commands and online help
 The program works with the commands formulated like the following:

@@ -376,7 +376,7 @@ UnpinOld = False
 Republish = True
 IPNSTTLString = 24h
 CIDVersion = 1
-IPFSChunker = size-262144
+IPFSChunker = size-65536
 # UserName = user
 # UserPassword = password
 '''
