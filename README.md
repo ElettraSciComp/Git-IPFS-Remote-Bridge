@@ -8,6 +8,8 @@ Git IPFS Remote Bridge is written in Python 3. It provides the following program
 
 Algorithms and logic here are partially inspired by [Dropbox Git helper](https://github.com/anishathalye/git-remote-dropbox) project.
 
+The program was developed under Remotization and Robotization Initiative at [Elettra Sincrotrone Trieste](https://www.elettra.eu/) by the members of the ICT/Scientific Computing Group.
+
 ### Intended use cases
 - Sharing tagged version-controlled open source code in closed communities of volunteer programmers (like [TANGO](https://tango-controls.readthedocs.io/en/latest/))
 - Sharing version-controlled datasets with publisher signature required
