@@ -1,0 +1,17 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: git-ipfs-remote-bridge
+Upstream-Contact: Andrey Vukolov <andrey.vukolov@elettra.eu>
+Source: https://github.com/ElettraSciComp/Git-IPFS-Remote-Bridge
+
+Files: *
+Copyright: 2023 Andrey Vukolov <andrey.vukolov@elettra.eu>
+License: LGPL
+
+Files: git-ipfs-remote-bridge-logo-512.png
+Copyright: 2023 Alexander Titov <aserwqq@gmail.com>
+License:  CC-BY-NC-ND
+
+Files: DEBIAN/*
+Copyright: 2023 Andrey Vukolov <andrey.vukolov@elettra.eu>
+License: GPL
+

@@ -1,0 +1,4 @@
+git-ipfs usr/bin
+git-remote-ipfs usr/bin
+git-ipfs-remote-bridge-logo-512.png usr/share/icons/hicolor/512x512/apps
+

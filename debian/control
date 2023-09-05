@@ -1,0 +1,38 @@
+Source: git-ipfs-remote-bridge
+Section: vcs
+Priority: optional
+Build-Depends: debhelper-compat (= 13)
+Maintainer: Andrey Vukolov <andrey.vukolov@elettra.eu>
+Uploaders: Fulvio Bille <fulvio.bille@elettra.eu>
+Homepage: https://github.com/ElettraSciComp/Git-IPFS-Remote-Bridge
+Vcs-Git: https://github.com/ElettraSciComp/Git-IPFS-Remote-Bridge.git
+Rules-Requires-Root: no
+
+Package: git-ipfs-remote-bridge
+Architecture: all
+Depends: python3, git, python3-requests, python3-urllib3, zlib1g, zlib1g-dev
+Enhances: git
+Recommends: git-lfs, git-remote-gcrypt, git-remote-hg
+Description: Git extension package for publishing repositories via IPFS
+ Git IPFS Remote Bridge is the set of programs written in Python 3 which allow
+ Git user to clone, push, fetch, self-host or release Git repositories over
+ IPFS decentralized data storage system. It provides the following programs:
+ - git-ipfs - the user interface program intended to be invoked by Git via
+ wrapper program withgit ipfs abbreviated command. This program act like a
+ frontend solution allowing the user to install/remove IPFS remote, maintain
+ the settings dedicated to communication with IPFS node. Also it provides the
+ instrument to prepare a release snapshot from the given tag or commit, and
+ immediately publish it separately on IPFS network.
+ - git-remote-ipfs - the remote helper program. It normally should not be
+ invoked by the end-user directly. Git invokes it maintaining the IPFS node
+ address used as remote URL, which has format like: url = ipfs://<node-id>.
+ The program addresses push, fetch, and list commands of Git protocol to IPFS
+ HTTP API of local node (by default) or remote node located somewhere in the
+ network. The Git repository published on IPFS network is an immutable entry,
+ so in the simplest case the program just calls git remote set-url to set the
+ new CID as remote URL after pushing the data to IPFS. Otherwise, the IPNS
+ cryptographically-signed entry key could be specified as remote URL.
+ In this case, the program automatically invokes IPFS node API to automatically
+ associate the obtained immutable CID calculated from the pushed repository
+ sdata, with specified IPNS key.
+ 

@@ -1,0 +1,14 @@
+git-ipfs-remote-bridge (0.4.1) UNRELEASED; urgency=low
+
+  * Tested in all working modes
+  * Fixed baremetal IPFS entry
+  * Fixed arguments treatment for specifying remote name during 
+    install/uninstall operations
+  * Added preservation of specific remote name absence when the
+    infrastructure have been uninstalled
+  * Added initial documentation
+  * Tested with BASIC server authentication on HTTP API entry point
+  * Added logo and disclaimer
+
+ -- Andrey Vukolov <andrey.vukolov@elettra.eu>  Mon, 04 Sep 2023 12:34:58 +0200
+

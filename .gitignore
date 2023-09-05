@@ -1,3 +1,8 @@
 .idea
 baremetal
+build/
+debian/git-ipfs-remote-bridge
+debian/debhelper-build-stamp
+debian/files
+*.substvars
 
