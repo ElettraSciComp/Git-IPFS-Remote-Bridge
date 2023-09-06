@@ -39,18 +39,16 @@ The very special feature of the `git-ipfs` program is a possibility to order Git
 - The program does not follow IPFS directory entry upload specification, maintaining only path-based addressing of the repository objects on the remote side. This was done to stay compatible with old Git clients supporting only `text/plain`-encoded HTTP responses during dumb cloning.
 
 ## Installation
-The generalized installation scripts for the program are WIP. 
-
-### Debian Packages
-Debian packages for the program are now available in the [Releases section](https://github.com/ElettraSciComp/Git-IPFS-Remote-Bridge/releases) of the repository.
-
-All packages built for the program are also available in the IPFS network over [IPNS](https://docs.ipfs.tech/concepts/ipns/) key owned and signed by [Elettra Sincrotrone Trieste](https://www.elettra.eu/) (public key `CAESIDWgSyisVvwpo70cFGxChM8QGmmlW/C69Ktf7KbMNhK/`):
+The generalized installation scripts for the program are WIP. All prebuilt packages are also available in the IPFS network over [IPNS](https://docs.ipfs.tech/concepts/ipns/) key owned and signed by [Elettra Sincrotrone Trieste](https://www.elettra.eu/) (public key `CAESIDWgSyisVvwpo70cFGxChM8QGmmlW/C69Ktf7KbMNhK/`):
 ```
 k51qzi5uqu5dhuvkwslj840k9anvr2udtw1qe8rlcc6z2slef23dy04ibpksut
 ```
 or fallback URIs:
 - https://ipfs.elettra.eu/ipns/k51qzi5uqu5dhuvkwslj840k9anvr2udtw1qe8rlcc6z2slef23dy04ibpksut
 - https://k51qzi5uqu5dhuvkwslj840k9anvr2udtw1qe8rlcc6z2slef23dy04ibpksut.ipns.twdragon.net/
+
+### Debian Packages
+Debian packages for the program are now available in the [Releases section](https://github.com/ElettraSciComp/Git-IPFS-Remote-Bridge/releases) of the repository.
 
 #### Building a Package
 Building your own Debian package requires `debhelper` script set installed on the system. Once it is done, the package can be built using just one command:
