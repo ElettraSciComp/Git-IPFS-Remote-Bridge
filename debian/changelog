@@ -1,3 +1,9 @@
+git-ipfs-remote-bridge (0.4.2) UNRELEASED; urgency=low
+
+  * Fixed Compression override
+
+ -- Andrey Vukolov <andrey.vukolov@elettra.eu>  Wed, 06 Sep 2023 19:20:00 +0200
+
 git-ipfs-remote-bridge (0.4.1) UNRELEASED; urgency=low
 
   * Tested in all working modes
