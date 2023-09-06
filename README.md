@@ -44,6 +44,14 @@ The generalized installation scripts for the program are WIP.
 ### Debian Packages
 Debian packages for the program are now available in the [Releases section](https://github.com/ElettraSciComp/Git-IPFS-Remote-Bridge/releases) of the repository.
 
+All packages built for the program are also available in the IPFS network over [IPNS](https://docs.ipfs.tech/concepts/ipns/) key owned and signed by [Elettra Sincrotrone Trieste](https://www.elettra.eu/) (public key `CAESIDWgSyisVvwpo70cFGxChM8QGmmlW/C69Ktf7KbMNhK/`):
+```
+k51qzi5uqu5dhuvkwslj840k9anvr2udtw1qe8rlcc6z2slef23dy04ibpksut
+```
+or fallback URIs:
+- https://ipfs.elettra.eu/ipns/k51qzi5uqu5dhuvkwslj840k9anvr2udtw1qe8rlcc6z2slef23dy04ibpksut
+- https://k51qzi5uqu5dhuvkwslj840k9anvr2udtw1qe8rlcc6z2slef23dy04ibpksut.ipns.twdragon.net/
+
 #### Building a Package
 Building your own Debian package requires `debhelper` script set installed on the system. Once it is done, the package can be built using just one command:
 ```sh

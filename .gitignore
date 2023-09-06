@@ -1,5 +1,6 @@
 .idea
 baremetal
+ipfs-release
 build/
 debian/git-ipfs-remote-bridge
 debian/debhelper-build-stamp
