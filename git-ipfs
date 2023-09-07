@@ -16,7 +16,7 @@ import json
 LOGICAL_TRUE = ('true', '1', 't', '+')
 
 
-def recursive_remove(directory: Path) -> None:
+def recursive_remove(directory: Path):
     for fobj in directory.iterdir():
         if fobj.is_dir():
             recursive_remove(fobj)
