@@ -1,3 +1,9 @@
+git-ipfs-remote-bridge (0.4.3) UNRELEASED; urgency=low
+
+  * Removed type hints for backward compatibility with older Python 3 releases
+
+ -- Andrey Vukolov <andrey.vukolov@elettra.eu>  Thu, 07 Sep 2023 18:48:06 +0200
+
 git-ipfs-remote-bridge (0.4.2) UNRELEASED; urgency=low
 
   * Fixed Compression override
