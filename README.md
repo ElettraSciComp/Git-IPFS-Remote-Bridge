@@ -47,6 +47,13 @@ or fallback URIs:
 - https://ipfs.elettra.eu/ipns/k51qzi5uqu5dhuvkwslj840k9anvr2udtw1qe8rlcc6z2slef23dy04ibpksut
 - https://k51qzi5uqu5dhuvkwslj840k9anvr2udtw1qe8rlcc6z2slef23dy04ibpksut.ipns.twdragon.net/
 
+### IPNS Repository
+The repository is also accessible on IPFS network under the following IPNS key:
+```
+k51qzi5uqu5dj4wofsvws9zlu6vzkaj203hhgvzsqm13mzdd2f8rmj8ghiw0j4
+```
+Please note that the IPNS access is immutable and it is intended for only initial cloning of the repository. The IPNS key is also owned and signed by [Elettra Sincrotrone Trieste](https://www.elettra.eu/).
+
 ### Debian Packages
 Debian packages for the program are now available in the [Releases section](https://github.com/ElettraSciComp/Git-IPFS-Remote-Bridge/releases) of the repository.
 
