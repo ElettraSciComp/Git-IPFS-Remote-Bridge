@@ -39,13 +39,22 @@ The very special feature of the `git-ipfs` program is a possibility to order Git
 - The program does not follow IPFS directory entry upload specification, maintaining only path-based addressing of the repository objects on the remote side. This was done to stay compatible with old Git clients supporting only `text/plain`-encoded HTTP responses during dumb cloning.
 
 ## Installation
-The generalized installation scripts for the program are WIP. All prebuilt packages are also available in the IPFS network over [IPNS](https://docs.ipfs.tech/concepts/ipns/) key owned and signed by [Elettra Sincrotrone Trieste](https://www.elettra.eu/) (public key `CAESIDWgSyisVvwpo70cFGxChM8QGmmlW/C69Ktf7KbMNhK/`):
+The generalized installation scripts for the program are WIP. All prebuilt packages are also available in the IPFS network over [IPNS](https://docs.ipfs.tech/concepts/ipns/) key owned and signed by [Elettra Sincrotrone Trieste](https://www.elettra.eu/) (PeerID/public key `12D3KooWDRhYM2x22w8AvkPnTpTUkHg8cUL7Zufsa36qdph7esft`):
 ```
 k51qzi5uqu5dhuvkwslj840k9anvr2udtw1qe8rlcc6z2slef23dy04ibpksut
 ```
 or fallback URIs:
 - https://ipfs.elettra.eu/ipns/k51qzi5uqu5dhuvkwslj840k9anvr2udtw1qe8rlcc6z2slef23dy04ibpksut
 - https://k51qzi5uqu5dhuvkwslj840k9anvr2udtw1qe8rlcc6z2slef23dy04ibpksut.ipns.twdragon.net/
+
+The Debian packages are provided also with the digital signature files. Since Kubo version `0.25.0` is installed, one can verify validity of the signature using Elettra PeerID and the following command:
+```sh
+ipfs key verify --ipns-base=base36 -k 12D3KooWDRhYM2x22w8AvkPnTpTUkHg8cUL7Zufsa36qdph7esft -s $(cat <SIGNATURE FILE NAME>) <DEBIAN PACKAGE FILE NAME>
+```
+The result should be:
+```
+{"Key":{"Name":"","Id":"k51qzi5uqu5dhipezdh5m4stpqglczgb2yx763q9skf97fdqoxbmt5g0stb3cv"},"SignatureValid":true}
+```
 
 ### IPNS Repository
 The repository is also accessible on IPFS network under the following IPNS key:
