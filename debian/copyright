@@ -11,7 +11,9 @@ Files: git-ipfs-remote-bridge-logo-512.png
 Copyright: 2023 Alexander Titov <aserwqq@gmail.com>
 License:  CC-BY-NC-ND
 
-Files: DEBIAN/*
-Copyright: 2023 Andrey Vukolov <andrey.vukolov@elettra.eu>
-License: GPL
+License: LGPL
+ https://www.gnu.org/licenses/lgpl-3.0.html
+
+License: CC-BY-NC-ND
+ https://creativecommons.org/licenses/by-nc-nd/4.0/
 

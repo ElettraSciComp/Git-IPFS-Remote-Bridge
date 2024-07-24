@@ -69,7 +69,7 @@ Debian packages for the program are now available in the [Releases section](http
 #### Building a Package
 Building your own Debian package requires `debhelper` script set installed on the system. Once it is done, the package can be built using just one command:
 ```sh
-debuild -i -us -uc -b
+debuild -i -us -uc
 ```
 It will build the package and place the file into the uplevel directory. For further information, see [Debhelper documentation](https://man7.org/linux/man-pages/man7/debhelper.7.html).
 

@@ -1,3 +1,11 @@
+git-ipfs-remote-bridge (0.4.4) UNRELEASED; urgency=low
+
+  * Added source package build to debhelper scenarios
+  * Prepared for Ubuntu PPA package recognition
+  * Fixed documentation
+
+ -- Andrey Vukolov <andrey.vukolov@elettra.eu>  Wed, 24 Jul 2024 16:31:48 +0200
+
 git-ipfs-remote-bridge (0.4.3) UNRELEASED; urgency=low
 
   * Removed type hints for backward compatibility with older Python 3 releases

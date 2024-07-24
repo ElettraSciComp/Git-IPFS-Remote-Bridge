@@ -1,6 +1,7 @@
 Source: git-ipfs-remote-bridge
 Section: vcs
 Priority: optional
+Standards-Version: 4.5.0
 Build-Depends: debhelper-compat (= 13)
 Maintainer: Andrey Vukolov <andrey.vukolov@elettra.eu>
 Uploaders: Fulvio Bille <fulvio.bille@elettra.eu>
@@ -10,7 +11,7 @@ Rules-Requires-Root: no
 
 Package: git-ipfs-remote-bridge
 Architecture: all
-Depends: python3, git, python3-requests, python3-urllib3, zlib1g, zlib1g-dev
+Depends: python3, git, python3-requests, python3-urllib3, zlib1g, zlib1g-dev, ${shlibs:Depends}, ${misc:Depends}
 Enhances: git
 Recommends: git-lfs, git-remote-gcrypt, git-remote-hg
 Description: Git extension package for publishing repositories via IPFS
