@@ -1,0 +1,4 @@
+tar-ignore = ".idea"
+tar-ignore = ".git"
+tar-ignore = "ipfs-release"
+tar-ignore = ".gitignore"

@@ -3,6 +3,7 @@ git-ipfs-remote-bridge (0.4.4) UNRELEASED; urgency=low
   * Added source package build to debhelper scenarios
   * Prepared for Ubuntu PPA package recognition
   * Fixed documentation
+  * Fixed TAR ignore list
 
  -- Andrey Vukolov <andrey.vukolov@elettra.eu>  Wed, 24 Jul 2024 16:31:48 +0200
 
