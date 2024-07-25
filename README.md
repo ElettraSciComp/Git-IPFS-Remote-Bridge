@@ -44,7 +44,7 @@ The very special feature of the `git-ipfs` program is a possibility to order Git
 Debian packages for the program are now available in the [Releases section](https://github.com/ElettraSciComp/Git-IPFS-Remote-Bridge/releases) of the repository.
 
 #### Ubuntu PPA
-The Debian packages are now sccessible also using Ubuntu PPA. To install them, add the PPA repository to your system:
+The Debian packages are now accessible also using Ubuntu PPA. To install them, add the PPA repository to your system:
 ```sh
 sudo su
 echo 'deb https://ppa.launchpadcontent.net/twdragon/ipfs/ubuntu <DISTRO> main' >> /etc/apt/sources.list.d/ipfs
