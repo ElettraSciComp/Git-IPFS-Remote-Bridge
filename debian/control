@@ -2,7 +2,7 @@ Source: git-ipfs-remote-bridge
 Section: vcs
 Priority: optional
 Standards-Version: 4.5.0
-Build-Depends: debhelper-compat (= 13)
+Build-Depends: debhelper-compat (= 13), pandoc, gzip (>= 1.5)
 Maintainer: Andrey Vukolov <andrey.vukolov@elettra.eu>
 Uploaders: Fulvio Bille <fulvio.bille@elettra.eu>
 Homepage: https://github.com/ElettraSciComp/Git-IPFS-Remote-Bridge
@@ -19,14 +19,14 @@ Description: Git extension package for publishing repositories via IPFS
  Git user to clone, push, fetch, self-host or release Git repositories over
  IPFS decentralized data storage system. It provides the following programs:
  - git-ipfs - the user interface program intended to be invoked by Git via
- wrapper program withgit ipfs abbreviated command. This program act like a
+ wrapper program with git ipfs abbreviated command. This program act like a
  frontend solution allowing the user to install/remove IPFS remote, maintain
  the settings dedicated to communication with IPFS node. Also it provides the
  instrument to prepare a release snapshot from the given tag or commit, and
  immediately publish it separately on IPFS network.
  - git-remote-ipfs - the remote helper program. It normally should not be
  invoked by the end-user directly. Git invokes it maintaining the IPFS node
- address used as remote URL, which has format like: url = ipfs://<node-id>.
+ address used as remote URL, which has format like: url = ipfs://<id>.
  The program addresses push, fetch, and list commands of Git protocol to IPFS
  HTTP API of local node (by default) or remote node located somewhere in the
  network. The Git repository published on IPFS network is an immutable entry,

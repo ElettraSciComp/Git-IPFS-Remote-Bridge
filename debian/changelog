@@ -1,3 +1,13 @@
+git-ipfs-remote-bridge (1.0.0) UNRELEASED; urgency=low
+
+  * Fixed IPNS key listing option for 'install' command
+  * Improved documentation
+  * Added IPNS key enumeration procedure for git helper
+  * Added object download progress indication by default
+  * 1.0 version release
+
+ -- Andrey Vukolov <andrey.vukolov@elettra.eu>  Wed, 19 Nov 2025 19:01:48 +0200
+
 git-ipfs-remote-bridge (0.4.4) UNRELEASED; urgency=low
 
   * Added source package build to debhelper scenarios

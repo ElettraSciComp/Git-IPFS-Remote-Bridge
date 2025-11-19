@@ -7,4 +7,6 @@ debian/debhelper-build-stamp
 debian/files
 debian/*.debhelper*
 *.substvars
+*.1
+*.1.gz
 

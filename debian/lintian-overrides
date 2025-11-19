@@ -1,2 +1,3 @@
 git-ipfs-remote-bridge: no-manual-page
+git-ipfs-remote-bridge: groff-message
 

@@ -135,28 +135,39 @@ Initial configuration not found!
             writerr('Unable to parse remote URL for {}: {}'.format(self.remote_name, self.remote_path))
             sys.exit(1)
         self.timeout = self.ipfs_request_timeout
-        writerr('Checking remote URL {} for valid baremetal repository'.format(self.remote_path))
-        req_param = {
-            'arg': '/ipns/' + self.ipfs_path[1],
-            'headers': False,
-            'resolve-type': True,
-            'size': False,
-            'stream': False
-        }
+        writerr('Checking IPNS key \'{}\' for validity and presence'.format(self.ipfs_path[1]))
         self.accessible_repo = False
         self.ipns_repo = False
         self.empty_repo = False
-        # IPFS FILESYSTEM
+        # IPFS FILESYSTEM: IPNS
         try:
-            api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout, auth=self.ipfs_api_auth)
+            req_param = {
+                'l': True
+            }
+            api_response = requests.post(self.ipfs_command('key/list'), params=req_param, timeout=self.timeout, auth=self.ipfs_api_auth)
             if api_response.status_code == 200:
-                self.accessible_repo = True
-                writerr('Found valid IPNS entry')
-                self.ipns_repo = True
+                ipns_keys_list = api_response.json()['Keys']
+                found_entry = False
+                for ipns_key_entry in ipns_keys_list:
+                    if ipns_key_entry['Id'] == self.ipfs_path[1]:
+                        found_entry = True
+                        break
+                if found_entry:
+                    self.accessible_repo = True
+                    writerr('Found valid IPNS entry')
+                    self.ipns_repo = True
         except requests.exceptions.ReadTimeout:
             writerr('Valid IPNS repository not found at {}'.format(self.remote_path))
             self.accessible_repo = False
         if not self.ipns_repo:
+            writerr('Checking for valid immutable IPFS entry'.format(self.remote_path))
+            req_param = {
+                'arg': '/ipfs/' + self.ipfs_path[1],
+                'headers': False,
+                'resolve-type': True,
+                'size': False,
+                'stream': False
+            }
             req_param['arg'] = self.ipfs_path[1]
             try:
                 api_response = requests.post(self.ipfs_command('ls'), params=req_param, timeout=self.timeout, auth=self.ipfs_api_auth)
@@ -166,7 +177,7 @@ Initial configuration not found!
             except requests.exceptions.ReadTimeout:
                 writerr('Valid immutable IPFS entry not found at {}'.format(self.remote_path))
                 self.accessible_repo = False
-        self.ipfs_path = req_param['arg']
+        self.ipfs_path = '/ipfs/' + self.ipfs_path[1]
         # GIT
         self.references = {}
         # MISC
@@ -365,7 +376,7 @@ Total: {}
         references_location_info = (Path(self.git_dir) / Path('info/refs')).open('rb').read()
         files['objects/info/packs'] = objects_location_info
         files['info/refs'] = references_location_info
-        writerr('Uploading data...')
+        writerr('Uploading data to IPFS entry storage...')
         wrapper_dir_hash = None
         try:
             api_response = requests.post(self.ipfs_command('add'), params=req_param, files=files, auth=self.ipfs_api_auth, timeout=self.timeout)
@@ -444,8 +455,7 @@ Total: {}
                     obj_path = obj[:2]
                     obj_name = obj[2:]
                     obj_posixpath = Path.as_posix(Path('objects') / Path(obj_path) / Path(obj_name))
-                    if self.verbosity == VerbosityType.DEBUG:
-                        writerr('Downloading {}'.format(obj_posixpath))
+                    writerr('Downloading {}'.format(obj_posixpath))
                     req_param = {
                         'arg': self.ipfs_path + '/' + obj_posixpath,
                         'offset': 0,

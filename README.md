@@ -101,12 +101,13 @@ All the previously defined remote settings, include URLs which were existing bef
 ### Cloning
 The program supports direct cloning of the repository from IPFS network. It can be done with command:
 ```sh
-git ipfs clone <ID> <directory> <URL>
+git ipfs clone <CID/IPNS> <directory> <URL> [<PORT>]
 ```
 where:
-- `<ID>` is IPFS CID or IPNS entry key to clone the repository from. It will be also used as the remote address.
+- `<CID/IPNS>` is IPFS CID or IPNS entry key to clone the repository from. It will be also used as the remote address.
 - `<directory>` is a relative path to the directory in which the downloaded repository data will be placed.
 - `<URL>` is an IPFS API URL as it was described above.
+- `<PORT>` is an IPFS API HTTP port (optional).
 
 ### Configuration
 Configuration of the IPFS bridge is repository-specific. During the default installation process, the default configuration file is always installed. It complies with old INI key-value configuration format. The ordinary config file has the only section called `IPFS`. It is always named `config` being placed in `.git/ipfs` directory. This file contains both the regular setting intended to be adjusted by the `git ipfs` command, and advanced settings that should be adjusted manually.
@@ -135,30 +136,7 @@ The program works with the commands formulated like the following:
 ```sh
 git ipfs <command> <mode> [options] <arguments>
 ```
-Every command has its own online help. The `-h` key should be used to view the online help of the given command. In the help message, all available modes and options for the specified command will be described. Note that if the argument/option is **not required**, its name will be written within the brackets (`[]`). For example, for `clone` command the online help looks as the following:
-```
-git ipfs clone -h
-usage: git-ipfs clone [-h] [-t TIMEOUT] [-r [REMOTE_NAME]] [-b [BRANCH]] [-n [USERNAME]] [-p [PASSWORD]] ipfs_id directory api_url [api_port]
-
-positional arguments:
-  ipfs_id               IPFS CID or IPNS peer name to use as remote ID
-  directory             Relative directory to clone the repository in
-  api_url               IPFS node API URL (API must be active to view the remote Git database!), default is http://127.0.0.1
-  api_port              IPFS node API port (will be attached to URL) [5001]
-
-options:
-  -h, --help            show this help message and exit
-  -t TIMEOUT, --timeout TIMEOUT
-                        Network timeout for API communications, sec (float)
-  -r [REMOTE_NAME], --remote-name [REMOTE_NAME]
-                        Gives the remote name to make an IPFS remote, default is origin
-  -b [BRANCH], --branch [BRANCH]
-                        Gives name of the branch to checkout
-  -n [USERNAME], --username [USERNAME]
-                        HTTP authentication username
-  -p [PASSWORD], --password [PASSWORD]
-                        HTTP authentication password
-```
+Every command has its own online help. The `-h` key should be used to view the online help of the given command. In the help message, all available modes and options for the specified command will be described. Note that if the argument/option is **not required**, its name will be written within the brackets (`[]`). 
 
 Every working mode also has its own online help. If the user specifies `-h` key after mentioning the working mode, for example, `git ipfs config manage -h`, the online help for this mode will be printed.
 

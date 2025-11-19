@@ -2,5 +2,11 @@
 %:
 	dh $@
 
+binary: manpage
+
+manpage:
+	pandoc -s doc/man/manpage.md -f markdown -t man -V section=1 -V header:'Git IPFS Remote Bridge(1)' -V footer='git-ipfs, git-remote-ipfs' -o doc/man/git-ipfs.1
+	gzip doc/man/git-ipfs.1
+
 override_dh_builddeb:
 	dh_builddeb -- -Zgzip
