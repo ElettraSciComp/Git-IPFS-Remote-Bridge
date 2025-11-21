@@ -9,4 +9,7 @@ debian/*.debhelper*
 *.substvars
 *.1
 *.1.gz
+*.egg-info/
+dist/
+venv/
 

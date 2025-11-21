@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools >= 61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "git-ipfs-remote-bridge"
+version = "1.0.0"
+dependencies = [
+  "requests"
+]
+requires-python = ">= 3.5"
+authors = [
+  {name = "Andrey Vukolov", email = "andrey.vukolov@elettra.eu"}
+]
+maintainers = [
+  {name = "Fulvio Bille", email = "fulvio.bille@elettra.eu"}
+]
+description = "Git IPFS Remote Bridge is the set of programs written in Python 3 which allow Git user to clone, push, fetch, self-host or release Git repositories over IPFS decentralized data storage system"
+readme = "README.md"
+license = "LGPL-2.1"
+license-files = ["LICENSE"]
+keywords = ["git", "vcs", "ipfs", "decentralised", "version control", "ipns"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: System Administrators",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Software Development :: Version Control :: Git",
+  "Topic :: System :: Distributed Computing",
+  "Topic :: Communications :: File Sharing"
+]
+
+[project.scripts]
+git-ipfs = "git_ipfs_remote_bridge.git_ipfs_wrapper:git_ipfs"
+git-remote-ipfs = "git_ipfs_remote_bridge.git_ipfs_wrapper:git_remote_ipfs"
+
+[project.urls]
+Documentation = "https://github.com/ElettraSciComp/Git-IPFS-Remote-Bridge/blob/master/README.md"
+Repository = "https://github.com/ElettraSciComp/Git-IPFS-Remote-Bridge/"
+Issues = "https://github.com/ElettraSciComp/Git-IPFS-Remote-Bridge/issues"
+Changelog = "https://github.com/ElettraSciComp/Git-IPFS-Remote-Bridge/blob/master/debian/changelog"
+
+# ------------------------------------------------------------------
+# Setuptools-specific configuration
+# ------------------------------------------------------------------
+[tool.setuptools]
+packages = ["git_ipfs_remote_bridge"]
+
+[tool.setuptools.package-data]
+"git_ipfs_remote_bridge" = ["git-ipfs", "git-remote-ipfs"]
+
