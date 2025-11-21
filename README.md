@@ -46,17 +46,6 @@ Debian packages for the program are now available in the [Releases section](http
 #### Ubuntu PPA
 The Debian packages are now accessible also using Ubuntu PPA. To install them, add the PPA repository to your system:
 ```sh
-sudo su
-echo 'deb https://ppa.launchpadcontent.net/twdragon/ipfs/ubuntu <DISTRO> main' >> /etc/apt/sources.list.d/ipfs
-echo 'deb-src https://ppa.launchpadcontent.net/twdragon/ipfs/ubuntu <DISTRO> main' >> /etc/apt/sources.list.d/ipfs
-apt update
-apt install git-ipfs-remote-bridge
-exit
-```
-replacing DISTRO with your Ubuntu distribution codename (`jammy`, `noble`, `focal`, and `bionic` are supported).
-
-On the latest Ubuntu releases (`jammy` and later), the PPA could be added using a single command:
-```sh
 sudo add-apt-repository ppa:twdragon/ipfs
 sudo apt update
 ```
@@ -71,6 +60,13 @@ Building your own Debian package requires `debhelper` script set installed on th
 debuild
 ```
 It will build the package and place the file into the uplevel directory. For further information, see [Debhelper documentation](https://man7.org/linux/man-pages/man7/debhelper.7.html).
+
+### PyPI (useful for Windows users)
+```powershell
+python -m pip install git-ipfs-remote-bridge
+```
+
+The install scripts include wrapper that exposes the proper executables to Git if its executable is referenced in `PATH`.
 
 ### Baremetal/Source Installation
 As the program is written in Python and the Python interpreter is indicated in the same `PATH` context with Git, it is enough to copy the program executables somewhere to the directory also mentioned in this `PATH` context. For example, on most mainstream Linux distributions this could be done as the following:
