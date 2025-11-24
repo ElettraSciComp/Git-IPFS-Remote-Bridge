@@ -138,6 +138,8 @@ Initial configuration not found!
         writerr('Checking IPNS key \'{}\' for validity and presence'.format(self.ipfs_path[1]))
         self.accessible_repo = False
         self.ipns_repo = False
+        self.ipns_key = False
+        self.ipns_name = False
         self.empty_repo = False
         # IPFS FILESYSTEM: IPNS
         try:
@@ -155,12 +157,29 @@ Initial configuration not found!
                 if found_entry:
                     self.accessible_repo = True
                     writerr('Found valid IPNS entry')
-                    self.ipns_repo = True
+                    self.ipns_key = True
         except requests.exceptions.ReadTimeout:
             writerr('Valid IPNS repository not found at {}'.format(self.remote_path))
             self.accessible_repo = False
+        if not self.ipns_key:
+            writerr('Checking IPNS key \'{}\' for availability'.format(self.ipfs_path[1]))
+            try:
+                req_param = {
+                    'arg': '/ipns/' + self.ipfs_path[1],
+                    'nocache': True,
+                    'recursive': False,
+                    'dht-timeout': self.timeout
+                }
+                api_response = requests.post(self.ipfs_command('name/resolve'), params=req_param, timeout=self.timeout, auth=self.ipfs_api_auth)
+                if api_response.status_code == 200:
+                    writerr('Found resolvable IPNS entry')
+                    self.ipns_name = True
+            except requests.exceptions.ReadTimeout:
+                writerr('Valid IPNS repository not found at {}'.format(self.remote_path))
+                self.accessible_repo = False
+        self.ipns_repo = (self.ipns_key or self.ipns_name)
         if not self.ipns_repo:
-            writerr('Checking for valid immutable IPFS entry'.format(self.remote_path))
+            writerr('Checking {} for valid immutable IPFS entry'.format(self.remote_path))
             req_param = {
                 'arg': '/ipfs/' + self.ipfs_path[1],
                 'headers': False,
@@ -177,7 +196,11 @@ Initial configuration not found!
             except requests.exceptions.ReadTimeout:
                 writerr('Valid immutable IPFS entry not found at {}'.format(self.remote_path))
                 self.accessible_repo = False
-        self.ipfs_path = '/ipfs/' + self.ipfs_path[1]
+            writerr('IPFS entry {} is considered as an immutable IPFS CID'.format(self.remote_path))
+            self.ipfs_path = '/ipfs/' + self.ipfs_path[1]
+        else:
+            writerr('IPFS entry {} is considered as an IPNS key to resolve'.format(self.remote_path))
+            self.ipfs_path = '/ipns/' + self.ipfs_path[1]
         # GIT
         self.references = {}
         # MISC
@@ -455,7 +478,7 @@ Total: {}
                     obj_path = obj[:2]
                     obj_name = obj[2:]
                     obj_posixpath = Path.as_posix(Path('objects') / Path(obj_path) / Path(obj_name))
-                    writerr('Downloading {}'.format(obj_posixpath))
+                    sys.stderr.write('\rDownloading {}'.format(obj_posixpath))
                     req_param = {
                         'arg': self.ipfs_path + '/' + obj_posixpath,
                         'offset': 0,
@@ -517,6 +540,8 @@ Total: {}
             opt = cin()
             if len(opt) == 0:
                 break
+        sys.stderr.write('\n')
+        sys.stderr.flush()
         writeln()
 
     def read_symbolic_reference(self, ipfs_prefix: str):

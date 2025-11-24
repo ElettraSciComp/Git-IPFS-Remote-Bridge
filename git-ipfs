@@ -679,7 +679,7 @@ if arguments.commands == 'clone':
             print('Error checking out to {}'.format(arguments.branch))
             os.chdir(old_cwd)
             sys.exit(0)
-    print('IPFS repository cloned successfully')
+    print('Clone: completed')
     os.chdir(old_cwd)
 
 if arguments.commands == 'config':

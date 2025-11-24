@@ -1,3 +1,11 @@
+git-ipfs-remote-bridge (1.0.1) UNRELEASED; urgency=low
+
+  * Urgent fix for IPFS/IPNS repository ID bug
+  * Added full PyPI pipeline
+  * Preparations for automated publishing
+
+ -- Andrey Vukolov <andrey.vukolov@elettra.eu>  Wed, 19 Nov 2025 19:01:48 +0200
+
 git-ipfs-remote-bridge (1.0.0) UNRELEASED; urgency=low
 
   * Fixed IPNS key listing option for 'install' command
