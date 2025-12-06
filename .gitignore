@@ -12,4 +12,6 @@ debian/*.debhelper*
 *.egg-info/
 dist/
 venv/
+git_ipfs_remote_bridge/git-ipfs
+git_ipfs_remote_bridge/git-remote-ipfs
 
