@@ -1,6 +1,11 @@
 # Git IPFS Remote Bridge
 **Git IPFS Remote Bridge** is the set of programs written in Python 3 which allow Git user to clone, push, fetch, self-host or release Git repositories over [IPFS](https://ipfs.tech) decentralized data storage system.
 
+## Accessing This Repository over the IPFS Network
+This repository is available for cloning using the Git IPFS Remote Bridge program already installed, or over the dumb cloning by Git itself via an IPFS HTTPS gateway using the following addresses:
+- **IPNS key**: `k2k4r8l54k65haph3ty425ppcc30wa1v28hcqtcg68s19rzumxlp93ac` (running IPFS node and API URL required)
+- Public **HTTPS gateway** (provided by [ipfs.tech](https://ipfs.tech)): `https://k2k4r8l54k65haph3ty425ppcc30wa1v28hcqtcg68s19rzumxlp93ac.ipns.dweb.link` (for Git-only cloning)
+
 ## Overview
 Git IPFS Remote Bridge is written in Python 3. It provides the following programs: 
 - `git-ipfs` - the user interface program intended to be invoked by Git via wrapper program with`git ipfs` abbreviated command. This program act like a frontend solution allowing the user to install/remove IPFS remote, maintain the settings dedicated to communication with IPFS node. Also it provides the instrument to prepare a [**release snapshot**](#releases) from the given tag or commit, and immediately publish it separately on IPFS network.
